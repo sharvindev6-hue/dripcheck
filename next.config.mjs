@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async redirects() {
-    return [{ source: '/login', destination: '/', permanent: false }]
+    return []
   },
   images: {
     // Both supabase (user-uploaded wardrobe photos) and unsplash (seed script
