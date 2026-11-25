@@ -1,6 +1,6 @@
 # DripCheck — Recovery, Security & Design-System Plan
 
-Status: **proposed — awaiting approval**
+Status: **implemented (P0 + P1)** — see `README.md` and `DESIGN.md` for the shipped contract
 Repo: `C:\Users\Public\repos\dripcheck` (clone of `sharvindev6-hue/dripcheck`, branch `main`)
 Design source: `C:\Users\chat2\Downloads\dripcheck-app (1).zip` — **Bottle Green + Brass**
 

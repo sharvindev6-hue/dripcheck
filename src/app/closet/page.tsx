@@ -1,227 +1,304 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
-import { Item } from '@/types'
-import Navbar from '@/components/Navbar'
-import ItemCard from '@/components/ItemCard'
-import UploadModal from '@/components/UploadModal'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import ItemThumb from '@/components/ItemThumb'
+import Sheet from '@/components/Sheet'
 import { useToast } from '@/components/Toast'
-import { EmptyWardrobe } from '@/components/icons'
+import { SearchIcon } from '@/components/icons'
+import { createClient } from '@/lib/supabase'
+import { normalizeItem } from '@/lib/items'
+import { imageFor, useSignedImages } from '@/lib/useSignedImages'
+import { itemCostPerWear } from '@/lib/stats'
+import type { Item } from '@/types'
 
-// Single browser client for the whole module (avoids re-creating it every render)
-const supabase = createClient()
+type Filter = 'all' | Item['category']
+
+const FILTERS: Filter[] = ['all', 'top', 'bottom', 'outerwear', 'shoes']
 
 export default function ClosetPage() {
-  const [items, setItems] = useState<Item[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showUploadModal, setShowUploadModal] = useState(false)
-  const [filterCategory, setFilterCategory] = useState<string>('all')
-  const [suggestedTags, setSuggestedTags] = useState<Partial<Item> | null>(null)
-  const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set())
-  const [analyzing, setAnalyzing] = useState(false)
+  const router = useRouter()
   const { showToast } = useToast()
 
-  const loadItems = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .eq('user_id', user?.id ?? '')
-      .order('created_at', { ascending: false })
+  const [items, setItems] = useState<Item[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<Filter>('all')
+  const [query, setQuery] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-    if (error) {
-      console.error('Error loading items:', error)
-    } else {
-      setItems(data || [])
+  const signed = useSignedImages(items)
+  const selected = items.find(item => item.id === selectedId) ?? null
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.replace('/login')
+        return
+      }
+      const { data, error: queryError } = await supabase
+        .from('items')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (queryError) throw queryError
+      setItems((data ?? []).map(row => normalizeItem(row as Record<string, unknown>)))
+    } catch (loadError) {
+      console.error('[dripcheck:closet]', loadError)
+      setError('Your closet could not load. Check the Supabase setup and try again.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }, [])
+  }, [router])
 
   useEffect(() => {
-    loadItems()
-  }, [loadItems])
+    void load()
+  }, [load])
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('items').delete().eq('id', id)
-    if (error) {
-      showToast('Could not delete that item — try again.', 'error')
-    } else {
-      setItems(items.filter(item => item.id !== id))
-      showToast('Item removed from your closet.')
-    }
-  }
+  const counts = useMemo(() => {
+    const map: Record<string, number> = { all: items.length }
+    for (const item of items) map[item.category] = (map[item.category] ?? 0) + 1
+    return map
+  }, [items])
 
-  const handleUpload = async (file: File, tags?: Partial<Item>) => {
-    const fileExt = file.name.split('.').pop() || 'jpg'
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-
-    const { error: uploadError, data } = await supabase.storage
-      .from('wardrobe-items')
-      .upload(fileName, file)
-
-    if (uploadError) throw uploadError
-
-    // Build the full public URL — next/image needs it, a bare storage path breaks <Image>
-    const { data: { publicUrl } } = supabase.storage
-      .from('wardrobe-items')
-      .getPublicUrl(data.path)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
-
-    const { error: insertError } = await supabase.from('items').insert({
-      user_id: user.id,
-      image_url: publicUrl,
-      name: tags?.name || 'Clothing Item',
-      category: tags?.category || 'top',
-      primary_color: tags?.primary_color || 'black',
-      secondary_color: tags?.secondary_color || null,
-      formality: tags?.formality || 'casual',
-      warmth: tags?.warmth || 'mild',
-      price: tags?.price ?? null,
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return items.filter(item => {
+      if (filter !== 'all' && item.category !== filter) return false
+      if (!needle) return true
+      return (
+        item.name.toLowerCase().includes(needle) ||
+        item.primary_color.toLowerCase().includes(needle) ||
+        item.category.includes(needle)
+      )
     })
+  }, [filter, items, query])
 
-    if (insertError) throw insertError
+  const washCount = items.filter(item => item.status === 'dirty').length
 
-    await loadItems()
-    showToast('Added to your closet ✨')
-  }
-
-  const handleAnalyze = async (file: File): Promise<Partial<Item> | null> => {
-    setAnalyzing(true)
-    setSuggestedTags(null)
-    setAiFilledFields(new Set())
+  const toggleWash = async (item: Item) => {
+    const nextStatus = item.status === 'dirty' ? 'clean' : 'dirty'
     try {
-      const form = new FormData()
-      form.append('file', file)
-      const r = await fetch('/api/vision', { method: 'POST', body: form })
-      if (!r.ok) return null
-      const data = await r.json()
-      if (!data.suggestedTags) return null
-      setSuggestedTags(data.suggestedTags)
-      // Track which fields were filled by AI so the modal can badge them.
-      const filled = new Set<string>()
-      for (const [k, v] of Object.entries(data.suggestedTags)) {
-        if (v !== null && v !== '' && v !== undefined) filled.add(k)
-      }
-      setAiFilledFields(filled)
-      return data.suggestedTags
+      const response = await fetch(`/api/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+      if (!response.ok) throw new Error('patch failed')
+      setItems(previous =>
+        previous.map(row => (row.id === item.id ? { ...row, status: nextStatus } : row))
+      )
+      showToast(nextStatus === 'dirty' ? 'Sent to the wash.' : 'Back in rotation.')
     } catch {
-      return null
-    } finally {
-      setAnalyzing(false)
+      showToast('Could not update that piece.', 'error')
     }
   }
 
-  const handleModalOpen = () => {
-    // Fresh state per open so previous AI tags don't leak into a new item.
-    setSuggestedTags(null)
-    setAiFilledFields(new Set())
-    setShowUploadModal(true)
-  }
-
-  const filteredItems = filterCategory === 'all'
-    ? items
-    : items.filter(item => item.category === filterCategory)
-
-  const counts: Record<string, number> = { all: items.length }
-  for (const item of items) {
-    counts[item.category] = (counts[item.category] || 0) + 1
+  const remove = async (item: Item) => {
+    if (!window.confirm(`Remove "${item.name}" from your closet? Its photo is deleted too.`)) {
+      return
+    }
+    try {
+      const response = await fetch(`/api/items/${item.id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('delete failed')
+      setItems(previous => previous.filter(row => row.id !== item.id))
+      setSelectedId(null)
+      showToast('Removed from your closet.')
+    } catch {
+      showToast('Could not remove that piece.', 'error')
+    }
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-cream">
-      <Navbar />
-
-      <main className="flex-1 p-4 pb-28 md:p-10 md:pb-10">
-        <div className="max-w-6xl mx-auto">
-          <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="font-mono text-[11px] font-extrabold uppercase tracking-[0.18em] text-ink-soft">↳ THE WARDROBE</p>
-              <h1 className="mt-1 font-mono text-5xl font-extrabold uppercase leading-none tracking-tighter text-ink md:text-6xl">
-                YOUR CLOSET
-              </h1>
-              <p className="mt-2 font-mono text-sm font-bold uppercase tracking-wider text-ink-soft">
-                {items.length} {items.length === 1 ? 'PIECE' : 'PIECES'} IN THE ROTATION
-              </p>
-            </div>
-            <button
-              onClick={handleModalOpen}
-              className="group inline-flex items-center gap-2 self-start bg-pink border-[3px] border-ink shadow-chunk px-5 py-3 font-mono font-extrabold uppercase tracking-wider text-ink btn-press"
-            >
-              <span aria-hidden="true">＋</span>
-              <span>ADD ITEM</span>
-            </button>
-          </header>
-
-          <div className="mb-8 flex flex-wrap gap-2 pb-1">
-            {['all', 'top', 'bottom', 'shoes', 'outerwear'].map((cat, i) => {
-              const active = filterCategory === cat
-              return (
-                <button
-                  key={cat}
-                  onClick={() => setFilterCategory(cat)}
-                  className={`fade-up fade-up-d${Math.min(i + 1, 8)} inline-flex items-center gap-2 border-[3px] border-ink px-4 py-2 font-mono font-extrabold uppercase tracking-wider transition-all btn-press
-                              ${active
-                                ? 'bg-ink text-cream shadow-chunk'
-                                : 'bg-cream text-ink hover:bg-yellow'}`}
-                >
-                  <span>{cat.replace('_', ' ')}</span>
-                  <span className={`border-2 border-ink px-2 py-0.5 text-[10px] ${active ? 'bg-cream text-ink' : 'bg-cyan text-ink'}`}>
-                    {counts[cat] || 0}
-                  </span>
-                </button>
-              )
-            })}
+    <section className="scr on">
+      <div className="tbar">Closet</div>
+      <div className="scroll">
+        <div className="lt">
+          <div className="ltrow">
+            <h1 className="ttl">
+              <mark className="hl">Closet</mark>
+            </h1>
+            <Link href="/add" className="try">
+              + Add
+            </Link>
           </div>
+          <p>
+            {items.length} {items.length === 1 ? 'piece' : 'pieces'}
+            {washCount > 0 ? `, ${washCount} in the wash` : ''}. Tap one to see it up close.
+          </p>
+        </div>
 
-          {loading ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="shimmer aspect-square border-[3px] border-ink" />
-              ))}
-            </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="bg-cream border-[3px] border-ink shadow-chunkLg px-6 py-16 text-center">
-              <div className="mx-auto mb-5 flex justify-center">
-                <EmptyWardrobe size={140} />
-              </div>
-              <h3 className="font-mono text-3xl font-extrabold uppercase tracking-tighter text-ink">CLOSET IS EMPTY</h3>
-              <p className="mx-auto mt-2 max-w-sm font-mono text-sm font-bold uppercase tracking-wider text-ink-soft">
-                ADD A FEW PIECES & MILLI WILL START COOKING
-              </p>
+        <label className="sr0">
+          <SearchIcon size={20} />
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder="Search your closet"
+            autoComplete="off"
+            aria-label="Search your closet"
+          />
+        </label>
+
+        <div className="tabs2">
+          {FILTERS.map(value => (
+            <button
+              key={value}
+              type="button"
+              className={filter === value ? 'on' : undefined}
+              onClick={() => setFilter(value)}
+            >
+              {value === 'all' ? 'All' : value[0].toUpperCase() + value.slice(1)}
+              <b>{counts[value] ?? 0}</b>
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="empty">
+            <p className="empty-eyebrow">Closet</p>
+            <h2>Loading your pieces…</h2>
+            <p>Reading the rail.</p>
+          </div>
+        ) : error ? (
+          <div className="empty">
+            <p className="empty-eyebrow">Something is offline</p>
+            <h2>Your closet did not load.</h2>
+            <p>{error}</p>
+            <button type="button" className="btn pri" onClick={() => void load()}>
+              Try again
+            </button>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="empty">
+            <p className="empty-eyebrow">Empty rail</p>
+            <h2>Your closet is waiting.</h2>
+            <p>Add a few pieces and the stylist starts building complete looks from what you own.</p>
+            <Link href="/add" className="btn pri">
+              Add your first piece
+            </Link>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="empty">
+            <p className="empty-eyebrow">No matches</p>
+            <h2>Nothing on this rail.</h2>
+            <p>Try another category or a shorter search.</p>
+            <button
+              type="button"
+              className="btn pri"
+              onClick={() => {
+                setQuery('')
+                setFilter('all')
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="g2">
+            {visible.map(item => (
               <button
-                onClick={handleModalOpen}
-                className="mt-6 inline-flex items-center gap-2 bg-yellow border-[3px] border-ink shadow-chunk px-6 py-3 font-mono font-extrabold uppercase tracking-wider text-ink btn-press"
+                key={item.id}
+                type="button"
+                className={item.status === 'dirty' ? 'tile dirty' : 'tile'}
+                onClick={() => setSelectedId(item.id)}
               >
-                <span aria-hidden="true">＋</span> ADD YOUR FIRST ITEM
+                <div className="art">
+                  {item.status === 'dirty' ? <span className="bd">Wash</span> : null}
+                  <ItemThumb item={item} src={imageFor(item, signed)} />
+                </div>
+                <b>{item.name}</b>
+                <small>
+                  {item.category} · {item.fit ?? 'regular'}
+                </small>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Sheet open={Boolean(selected)} onClose={() => setSelectedId(null)} title={selected?.name}>
+        {selected ? (
+          <>
+            <div className="art">
+              <ItemThumb item={selected} src={imageFor(selected, signed)} />
+            </div>
+            <div className="grp">
+              <div className="rw">
+                <div className="t">Category</div>
+                <span className="v" style={{ textTransform: 'capitalize' }}>
+                  {selected.category}
+                </span>
+              </div>
+              <div className="rw">
+                <div className="t">Fit</div>
+                <span className="v" style={{ textTransform: 'capitalize' }}>
+                  {selected.fit ?? 'regular'}
+                </span>
+              </div>
+              <div className="rw">
+                <div className="t">Warmth</div>
+                <span className="v" style={{ textTransform: 'capitalize' }}>
+                  {selected.warmth}
+                </span>
+              </div>
+              <div className="rw">
+                <div className="t">Colour</div>
+                <span className="v">
+                  <span
+                    className="dot"
+                    style={{ background: selected.color_hex ?? '#A8A6A1', display: 'inline-block', verticalAlign: 'middle', marginRight: 8 }}
+                  />
+                  {selected.primary_color}
+                </span>
+              </div>
+              <div className="rw">
+                <div className="t">Price</div>
+                <span className="v">{selected.price != null ? `$${selected.price.toFixed(2)}` : '—'}</span>
+              </div>
+              <div className="rw">
+                <div className="t">
+                  Cost per wear
+                  <small>
+                    {selected.times_worn > 0
+                      ? `${selected.times_worn} wear${selected.times_worn === 1 ? '' : 's'}`
+                      : 'Not worn yet'}
+                  </small>
+                </div>
+                <span className="v">
+                  {itemCostPerWear(selected) != null ? `$${itemCostPerWear(selected)!.toFixed(2)}` : '—'}
+                </span>
+              </div>
+              <button type="button" className="rw" onClick={() => void toggleWash(selected)}>
+                <div className="t">In the wash</div>
+                <span className={selected.status === 'dirty' ? 'sw2 on' : 'sw2'} />
               </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {filteredItems.map((item, i) => (
-                <div
-                  key={item.id}
-                  className={`fade-up fade-up-d${Math.min((i % 8) + 1, 8)}`}
-                >
-                  <ItemCard item={item} onDelete={handleDelete} />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </main>
 
-      <UploadModal
-        isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        onUpload={handleUpload}
-        suggestedTags={suggestedTags}
-        isAnalyzing={analyzing}
-        onAnalyze={handleAnalyze}
-        aiFilledFields={aiFilledFields}
-      />
-    </div>
+            {selected.status === 'dirty' ? (
+              <p className="week-why">This piece is in the wash. Mark it clean before building a look around it.</p>
+            ) : (
+              <Link href={`/?around=${selected.id}`} className="btn" onClick={() => setSelectedId(null)}>
+                Build a look around this
+              </Link>
+            )}
+
+            <div className="sheet-actions">
+              <button type="button" className="rw danger" onClick={() => void remove(selected)}>
+                <div className="t">Remove from closet</div>
+              </button>
+            </div>
+
+          </>
+        ) : null}
+      </Sheet>
+    </section>
   )
 }

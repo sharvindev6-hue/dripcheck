@@ -1,15 +1,17 @@
 'use client'
 
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 
-interface Toast {
+type ToastType = 'success' | 'error' | 'info'
+
+interface ToastState {
   id: number
   message: string
-  type: 'success' | 'error' | 'info'
+  type: ToastType
 }
 
 const ToastContext = createContext<{
-  showToast: (message: string, type?: Toast['type']) => void
+  showToast: (message: string, type?: ToastType) => void
 }>({ showToast: () => {} })
 
 export function useToast() {
@@ -17,37 +19,33 @@ export function useToast() {
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([])
+  const [toast, setToast] = useState<ToastState | null>(null)
   const idRef = useRef(0)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const showToast = useCallback((message: string, type: Toast['type'] = 'success') => {
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
     const id = ++idRef.current
-    setToasts((t) => [...t, { id, message, type }])
-    setTimeout(() => {
-      setToasts((t) => t.filter((toast) => toast.id !== id))
-    }, 3500)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setToast({ id, message, type })
+    timerRef.current = setTimeout(() => setToast(null), 3400)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
   }, [])
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      {/* Slide-down toast stack — non-blocking notifications. */}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex w-full max-w-sm flex-col gap-2 px-4 pointer-events-none">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            role="status"
-            className={`toast-enter border-[3px] border-ink px-4 py-3 text-sm font-mono font-extrabold uppercase tracking-wider shadow-chunk ${
-              toast.type === 'error'
-                ? 'bg-pink text-ink'
-                : toast.type === 'success'
-                  ? 'bg-lime text-ink'
-                  : 'bg-cyan text-ink'
-            }`}
-          >
-            {toast.message}
-          </div>
-        ))}
+      <div
+        className={toast ? 'toast on' : 'toast'}
+        role="status"
+        aria-live="polite"
+        data-type={toast?.type}
+      >
+        {toast?.message}
       </div>
     </ToastContext.Provider>
   )

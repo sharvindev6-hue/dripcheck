@@ -1,5 +1,7 @@
-import HomeDashboard from './HomeDashboard'
+import TodayScreen from './TodayScreen'
 
-export default function Home() {
-  return <HomeDashboard />
+export const dynamic = 'force-dynamic'
+
+export default function TodayPage() {
+  return <TodayScreen />
 }

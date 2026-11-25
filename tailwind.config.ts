@@ -1,45 +1,54 @@
 import type { Config } from "tailwindcss";
 
+/**
+ * Tailwind is a convenience layer only. The canonical visual language lives in
+ * `src/styles/tokens.css`, `shell.css`, and `screens.css` and is documented in
+ * DESIGN.md. Never introduce a colour that is not one of these tokens.
+ */
 const config: Config = {
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
+  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
       colors: {
         bg: "var(--bg)",
-        surface: {
-          1: "var(--surface-1)",
-          2: "var(--surface-2)",
-        },
-        text: {
-          DEFAULT: "var(--text)",
-          muted: "var(--muted)",
-          faint: "var(--faint)",
-        },
-        hairline: "var(--hairline)",
-        "hairline-strong": "var(--hairline-strong)",
-        cta: "var(--cta)",
-        "cta-text": "var(--cta-text)",
-        champagne: {
-          start: "var(--champagne-start)",
-          end: "var(--champagne-end)",
-        },
-        brick: "var(--brick)",
-        sage: "var(--sage)",
+        s1: "var(--s1)",
+        s2: "var(--s2)",
+        ph: "var(--ph)",
+        ph2: "var(--ph2)",
+        ink: "var(--ink)",
+        mu: "var(--mu)",
+        rule: "var(--rule)",
+        ac: "var(--ac)",
+        hi: "var(--hi)",
+        onac: "var(--onac)",
+        bk: "var(--bk)",
+        ok: "var(--ok)",
       },
       fontFamily: {
-        display: ["var(--font-display)", "serif"],
-        body: ["var(--font-body)", "sans-serif"],
-      },
-      boxShadow: {
-        luxe: "0 18px 50px rgba(0, 0, 0, 0.24)",
-        "ai-glow": "0 0 24px rgba(233, 211, 172, 0.25)",
+        display: [
+          "var(--font-display)",
+          "Archivo",
+          "Arial Narrow",
+          "system-ui",
+          "sans-serif",
+        ],
+        body: ["var(--font-body)", "Instrument Sans", "system-ui", "sans-serif"],
       },
       borderRadius: {
-        card: "1.5rem",
+        field: "12px",
+        card: "14px",
+        art: "16px",
+        sheet: "20px",
+        phone: "54px",
+      },
+      boxShadow: {
+        ring: "inset 0 0 0 1px var(--rule)",
+        "ring-strong": "inset 0 0 0 1.5px var(--ink)",
+        phone:
+          "0 0 0 9px #0c0b09, 0 0 0 11px #3a372f, 0 40px 80px -10px rgba(23,21,15,.5)",
+      },
+      transitionTimingFunction: {
+        brand: "cubic-bezier(.22,1,.36,1)",
       },
     },
   },

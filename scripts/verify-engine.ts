@@ -1,51 +1,58 @@
-// Throwaway regression check for Bug 1.1 — run with `npx tsx scripts/verify-engine.ts`
+// Focused regression check for the rules engine.
+// Run: npx tsx scripts/verify-engine.ts
 import { generateOutfit } from '../src/lib/outfitEngine'
 import type { Item } from '../src/types'
 
-const mk = (over: Partial<Item>): Item => ({
-  id: Math.random().toString(36).slice(2),
-  user_id: 'u1',
-  image_url: 'https://example.com/x.jpg',
-  name: 'Item',
-  category: 'top',
-  primary_color: 'black',
-  secondary_color: null,
-  formality: 'casual',
-  warmth: 'cold',
-  price: null,
-  created_at: new Date().toISOString(),
-  ...over,
-})
+function make(over: Partial<Item>): Item {
+  return {
+    id: Math.random().toString(36).slice(2),
+    user_id: 'u1',
+    image_url: 'https://example.com/x.jpg',
+    image_path: null,
+    name: 'Item',
+    category: 'top',
+    primary_color: 'black',
+    secondary_color: null,
+    formality: 'casual',
+    warmth: 'cold',
+    price: null,
+    garment_type: null,
+    color_hex: null,
+    fit: null,
+    status: 'clean',
+    times_worn: 0,
+    last_worn: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    ...over,
+  }
+}
 
 const items: Item[] = [
-  mk({ category: 'top', name: 'Hoodie', warmth: 'cold', primary_color: 'navy' }),
-  mk({ category: 'top', name: 'Sweater', warmth: 'cold', primary_color: 'grey' }),
-  mk({ category: 'bottom', name: 'Jeans', warmth: 'cold', primary_color: 'denim' }),
-  mk({ category: 'bottom', name: 'Cargos', warmth: 'cold', primary_color: 'black' }),
-  mk({ category: 'shoes', name: 'Boots', warmth: 'cold', primary_color: 'black' }),
-  mk({ category: 'shoes', name: 'Sneakers', warmth: 'cold', primary_color: 'white' }),
-  // NOTE: deliberately zero outerwear items
+  make({ category: 'top', name: 'Hoodie', warmth: 'cold', primary_color: 'navy' }),
+  make({ category: 'top', name: 'Sweater', warmth: 'cold', primary_color: 'grey' }),
+  make({ category: 'bottom', name: 'Jeans', warmth: 'cold', primary_color: 'denim' }),
+  make({ category: 'bottom', name: 'Cargos', warmth: 'cold', primary_color: 'black' }),
+  make({ category: 'shoes', name: 'Boots', warmth: 'cold', primary_color: 'black' }),
+  make({ category: 'shoes', name: 'Sneakers', warmth: 'cold', primary_color: 'white' }),
+  // Deliberately zero outerwear.
 ]
 
-for (let i = 0; i < 50; i++) {
+for (let i = 0; i < 50; i += 1) {
   const outfit = generateOutfit(items, 5, 'casual')
-  if (!outfit) {
-    console.error('FAIL: expected a valid outfit at temp=5 with no jackets, got null')
-    process.exit(1)
-  }
-  if (!outfit.top || !outfit.bottom || !outfit.shoes) {
-    console.error('FAIL: outfit missing required pieces')
+  if (!outfit || !outfit.top || !outfit.bottom || !outfit.shoes) {
+    console.error('FAIL: expected a valid cold-weather outfit with no outerwear')
     process.exit(1)
   }
 }
 
-// Also confirm it still works in mild weather without outerwear
-for (let i = 0; i < 10; i++) {
-  const outfit = generateOutfit(items.map((i) => ({ ...i, warmth: 'mild' })), 20, 'casual')
+// The old engine hard-filtered on the exact warmth band and returned null.
+for (let i = 0; i < 20; i += 1) {
+  const outfit = generateOutfit(items, 32, 'casual')
   if (!outfit) {
-    console.error('FAIL: expected valid mild-weather outfit')
+    console.error('FAIL: expected a fallback outfit when the exact warmth band is missing')
     process.exit(1)
   }
 }
 
-console.log('PASS: cold-weather + zero outerwear never crashes (Bug 1.1)')
+console.log('PASS: tiered warmth, cold weather, zero outerwear (B11)')

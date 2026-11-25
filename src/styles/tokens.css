@@ -1,0 +1,6 @@
+/* DripCheck design tokens: Bottle Green + Brass. Change brand colours here. */
+:root{--bg:#EFE8D8;--s1:#F7F2E6;--s2:#DFD6C2;--ph:#E4DCCC;--ph2:#D6CDBB;--ink:#10241C;--mu:#5B5F52;--rule:rgba(16,36,28,.16);--ac:#C9A24A;--hi:#E2C46A;--onac:#10241C;--bk:#0F3D2E;--ok:#2E7D4F;
+ --disp:var(--font-display),"Archivo","Arial Narrow",system-ui,sans-serif;--f:var(--font-body),"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+ --e:cubic-bezier(.22,1,.36,1);--tb:74px;--tbp:0px;--top:8px;color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0C1511;--s1:#14211B;--s2:#1F2F27;--ink:#EFE8D8;--mu:#A2A793;--rule:rgba(239,232,216,.16);--ac:#E2C46A;--hi:#E2C46A;--onac:#10241C;--ok:#5CC080;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0C1511;--s1:#14211B;--s2:#1F2F27;--ink:#EFE8D8;--mu:#A2A793;--rule:rgba(239,232,216,.16);--ac:#E2C46A;--hi:#E2C46A;--onac:#10241C;--ok:#5CC080;color-scheme:dark}

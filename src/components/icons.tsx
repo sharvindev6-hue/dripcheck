@@ -1,77 +1,207 @@
-// Chunky zine-style SVGs. Sharp corners, thick black strokes, no gradients.
-// Every mark is designed to look screen-printed, not AI-generated.
+// Monoline SVG icons from the approved design system. Every icon is a chunky,
+// single-weight stroke — no emoji in chrome, no mixed icon families.
 
-export function BrandMark({ size = 32 }: { size?: number }) {
+import type { CSSProperties } from 'react'
+
+interface IconProps {
+  size?: number
+  className?: string
+  style?: CSSProperties
+  strokeWidth?: number
+}
+
+function svgProps({ size, className, style, strokeWidth }: IconProps) {
+  return {
+    viewBox: '0 0 24 24',
+    className: className ?? 'i',
+    'aria-hidden': true as const,
+    style: size ? { ...style, width: size, height: size } : style,
+    ...(strokeWidth ? { strokeWidth } : {}),
+  }
+}
+
+export function TodayIcon(props: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      {/* Hanger silhouette — hot pink fill, black border, hard offset shadow. */}
-      <path
-        d="M16 4a2 2 0 1 1-1.6 3.2L4 14v12a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V14L17.6 7.2A2 2 0 1 1 16 4Z"
-        fill="#FF2E88"
-        stroke="#000"
-        strokeWidth="2.5"
-        strokeLinejoin="round"
-      />
-      {/* Cyan sparkle on the hook — extra zine energy. */}
-      <path d="M22 5l1 3 3 1-3 1-1 3-1-3-3-1 3-1z" fill="#00D9E0" stroke="#000" strokeWidth="1.5" strokeLinejoin="round" />
+    <svg {...svgProps(props)}>
+      <path d="M12 8a2.5 2.5 0 1 0-2.5-2.5M12 8v2.2L21 16a1 1 0 0 1-.6 1.8H3.6A1 1 0 0 1 3 16l9-5.8" />
     </svg>
   )
+}
+
+export function ClosetIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    </svg>
+  )
+}
+
+export function HeartIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z" />
+    </svg>
+  )
+}
+
+export function YouIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  )
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M12 6v12M6 12h12" />
+    </svg>
+  )
+}
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m20 20-4.2-4.2" />
+    </svg>
+  )
+}
+
+export function SendIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M12 19V5M6 11l6-6 6 6" />
+    </svg>
+  )
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="m5 12.5 4.5 4.5L19 7.5" />
+    </svg>
+  )
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  )
+}
+
+export function WeatherIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M7 14a4 4 0 1 1 .8-7.9A5 5 0 0 1 17.5 7 3.5 3.5 0 0 1 17 14zM9 17v3M13 17v3M17 17v3" />
+    </svg>
+  )
+}
+
+export function LockIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <rect x="5" y="11" width="14" height="9" rx="2.5" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </svg>
+  )
+}
+
+export function ChevronIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  )
+}
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M14 4l6 6L8 22H2v-6z" />
+      <path d="M14 4l6 6" />
+    </svg>
+  )
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6 18 21H6L5 6" />
+    </svg>
+  )
+}
+
+export function CameraIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" />
+      <circle cx="12" cy="14" r="3.5" />
+    </svg>
+  )
+}
+
+export function HangerIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <path d="M12 8V6.5a2 2 0 1 1 2-2" />
+      <path d="M12 8 3.2 14.6A1.6 1.6 0 0 0 4.2 17.4h15.6a1.6 1.6 0 0 0 1-2.8L12 8z" />
+    </svg>
+  )
+}
+
+export function SunIcon(props: IconProps) {
+  return (
+    <svg {...svgProps(props)}>
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" />
+    </svg>
+  )
+}
+
+/* -------------------------------------------------------------------------
+ * Temporary compatibility exports for the pre-redesign screens. These are
+ * removed once every screen uses the design-system primitives.
+ * ---------------------------------------------------------------------- */
+
+export function BrandMark({ size = 32 }: { size?: number }) {
+  return <HangerIcon size={size} />
 }
 
 export function MilliAvatar({ size = 40 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      {/* Lemon-yellow face circle with black outline. */}
-      <circle cx="20" cy="20" r="18" fill="#FFE600" stroke="#000" strokeWidth="2.5" />
-      {/* Hot-pink visor — Milli's signature. */}
-      <rect x="5" y="12" width="30" height="6" fill="#FF2E88" stroke="#000" strokeWidth="2" />
-      {/* Eyes — cyan dots with black pupils. */}
-      <circle cx="14" cy="22" r="2.5" fill="#00D9E0" stroke="#000" strokeWidth="1.5" />
-      <circle cx="26" cy="22" r="2.5" fill="#00D9E0" stroke="#000" strokeWidth="1.5" />
-      {/* Smirk. */}
-      <path d="M14 28 Q20 32 26 28" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round" />
+    <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="18" fill="var(--ac)" stroke="var(--bk)" strokeWidth="2" />
+      <text
+        x="20"
+        y="26"
+        textAnchor="middle"
+        fontFamily="var(--font-display), sans-serif"
+        fontSize="16"
+        fontWeight="800"
+        fill="var(--bk)"
+      >
+        M
+      </text>
     </svg>
   )
 }
 
-export function EmptyWardrobe({ size = 140 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 140 140" fill="none" aria-hidden="true">
-      {/* Hanger glyph in a chunky border — looks like a sticker. */}
-      <rect x="14" y="14" width="112" height="112" fill="#FFFBE6" stroke="#000" strokeWidth="4" />
-      <rect x="14" y="14" width="112" height="14" fill="#FF2E88" stroke="#000" strokeWidth="4" />
-      <line x1="34" y1="58" x2="106" y2="58" stroke="#000" strokeWidth="3" />
-      <path
-        d="M70 58a6 6 0 1 0-4.8 9.6L46 78v22a4 4 0 0 0 4 4h40a4 4 0 0 0 4-4V78L74.8 67.6A6 6 0 1 0 70 58Z"
-        fill="#00D9E0"
-        stroke="#000"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
-      <path d="M104 92l2 5 5 1-4 3 1 5-4-2-4 2 1-5-4-3 5-1z" fill="#FFE600" stroke="#000" strokeWidth="2" />
-    </svg>
-  )
+export function EmptySparkles({ size }: { size?: number } = {}) {
+  void size
+  return null
 }
 
-export function EmptySparkles({ size = 100 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true">
-      <path d="M50 8l7 22 22 7-22 7-7 22-7-22-22-7 22-7z" fill="#FF2E88" stroke="#000" strokeWidth="3" strokeLinejoin="round" />
-      <path d="M82 56l3 8 8 3-8 3-3 8-3-8-8-3 8-3z" fill="#00D9E0" stroke="#000" strokeWidth="2.5" strokeLinejoin="round" />
-      <path d="M16 66l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#FFE600" stroke="#000" strokeWidth="2.5" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-const COLOR_HEX: Record<string, string> = {
-  black: '#0A0A0A', white: '#FFFBE6', grey: '#9CA3AF', gray: '#9CA3AF',
-  navy: '#1E3A8A', blue: '#2563EB', beige: '#D6C5A8', brown: '#7C5B3F',
-  red: '#DC2626', green: '#16A34A', yellow: '#FFE600', orange: '#EA580C',
-  pink: '#FF2E88', purple: '#7C3AED', teal: '#00D9E0', denim: '#1E3A8A',
-  cream: '#FFFBE6', tan: '#C2A07A', olive: '#65735A', maroon: '#7F1D1D',
-  khaki: '#A3956A', silver: '#A3A3A3', gold: '#CA8A04',
-}
-export function colorHex(name: string): string {
-  const key = name.toLowerCase().trim().split(/\s+/)[0] || ''
-  return COLOR_HEX[key] ?? '#9CA3AF'
+export function EmptyWardrobe({ size }: { size?: number } = {}) {
+  void size
+  return null
 }

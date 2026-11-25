@@ -2,6 +2,12 @@
 
 A per-phase journal of what I built, what broke, and what I learned. I'll keep appending to this as the project grows.
 
+> **Recovery note (2026-11-24):** this log predates the P0 + P1 recovery. The current
+> architecture is in `README.md` and the design contract is in `DESIGN.md`. Three claims below
+> are now superseded: the app uses one design-token CSS layer rather than a Tailwind palette;
+> stats include per-item lifetime cost-per-wear, not only a single total; and the outfit engine
+> has a Vitest suite plus a focused verification script. Auth has always been magic-link only.
+
 ## Phase 0 — Skeleton (pre-hackathon scaffold)
 - Picked **Next.js 14 App Router + TypeScript** because RSC + route handlers live in the same repo, which meant no separate backend service for the hackathon.
 - Set up **Tailwind** with a custom palette and `next/font` from the start so every later screen inherits a consistent look instead of ad-hoc hex codes.

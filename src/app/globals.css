@@ -2,129 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The design-system stylesheets (tokens, shell, screens) are imported after
+   this file in `app/layout.tsx`, so their resets and component styles win over
+   Tailwind's preflight. Keep this file limited to Tailwind + app-wide fixes. */
+
 :root {
-  --bg: #100F0D;
-  --surface-1: #191816;
-  --surface-2: #211F1C;
-  --hairline: rgba(245, 242, 236, 0.08);
-  --hairline-strong: rgba(245, 242, 236, 0.14);
-  --text: #F2EFE9;
-  --muted: #A7A199;
-  --faint: #6E6A61;
-  --cta: #F5F2EC;
-  --cta-text: #14120F;
-  --champagne-start: #E9D3AC;
-  --champagne-end: #C9B3E4;
-  --brick: #C97B6A;
-  --sage: #9DB58C;
+  /* Overridden by next/font/local class names on <html>. These fallbacks keep
+     the app readable if the font files fail to load. */
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
-html,
-body {
-  min-height: 100%;
-  background: var(--bg);
-  color: var(--text);
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
-  position: relative;
+  overscroll-behavior: none;
 }
 
-/* Subtle fixed grain keeps dark surfaces from feeling flat without adding
-   texture to scrolling content. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+/* Utility used by scrollable sheets/carousels that should not show a bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
-body > * {
-  position: relative;
-  z-index: 1;
+/* Closed sheets must leave the accessibility tree and tab order, but the
+   slide-out transition should still play. */
+.sheet:not(.on) {
+  visibility: hidden;
+  transition: transform 0.55s var(--e), visibility 0s 0.55s;
+}
+.sheet.on {
+  visibility: visible;
 }
 
-/* AI-only champagne treatment. */
-.ai-gradient {
-  background: linear-gradient(90deg, var(--champagne-start), var(--champagne-end));
-  color: var(--cta-text);
+/* Same treatment for the full-screen stylist overlay. */
+.chat:not(.on) {
+  visibility: hidden;
+  transition: transform 0.6s var(--e), visibility 0s 0.6s;
+}
+.chat.on {
+  visibility: visible;
 }
 
-@keyframes toast-in {
-  from { transform: translate(-50%, -12px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
-}
-
-.toast-enter {
-  animation: toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.fade-up {
-  animation: fade-up 360ms ease-out both;
-}
-
-.fade-up-d1 { animation-delay: 40ms; }
-.fade-up-d2 { animation-delay: 80ms; }
-.fade-up-d3 { animation-delay: 120ms; }
-.fade-up-d4 { animation-delay: 160ms; }
-.fade-up-d5 { animation-delay: 200ms; }
-.fade-up-d6 { animation-delay: 240ms; }
-.fade-up-d7 { animation-delay: 280ms; }
-.fade-up-d8 { animation-delay: 320ms; }
-
-@keyframes shimmer {
-  from { background-position: -200% 0; }
-  to { background-position: 200% 0; }
-}
-
-.shimmer {
-  background-image: linear-gradient(90deg, var(--surface-1) 0%, var(--surface-2) 50%, var(--surface-1) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s linear infinite;
-}
-
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--surface-2); border: 1px solid var(--hairline-strong); }
-::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-:focus-visible {
-  outline: 2px solid var(--champagne-start);
-  outline-offset: 3px;
-}
-
-::selection {
-  background: var(--champagne-start);
-  color: var(--cta-text);
-}
-
-.btn-press {
-  transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
-}
-
-.btn-press:hover {
-  transform: translateY(-1px);
-}
-
-.btn-press:active {
-  transform: translateY(0) scale(0.98);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-  }
+/* Visually hidden but available to screen readers. */
+.sr-only-ui {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

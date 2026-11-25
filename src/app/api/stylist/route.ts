@@ -1,28 +1,39 @@
-// Server-side stylist endpoint. The client only sends { occasion, temp?, note? } —
-// ALL other context (items, recent outfits) is fetched here. Without FEATHERLESS_API_KEY
-// the route silently falls through to the rules engine, so the app never goes dark.
+// Server-side stylist endpoint. The client sends only the occasion, temperature
+// and an optional note. Everything else — the wardrobe, recent looks, profile
+// preference — is read here. Any AI failure falls back to the rules engine, so
+// the user always gets a complete look.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-server'
-import { generateOutfit, getTemplateExplanation } from '@/lib/outfitEngine'
+import {
+  badRequest,
+  getAuth,
+  logServerError,
+  serverError,
+  tooMany,
+  unauthorized,
+} from '@/lib/api'
+import { rateLimitPair } from '@/lib/rate-limit'
+import { stylistRequestSchema } from '@/lib/schemas'
+import { normalizeItem } from '@/lib/items'
+import { getServerEnv } from '@/lib/env'
+import {
+  comboFromIds,
+  explainOutfit,
+  generateOutfit,
+  matchPercent,
+  scoreCombo,
+  type EngineOptions,
+  type SilhouettePreference,
+} from '@/lib/outfitEngine'
+import { orderOutfitIds } from '@/lib/outfitSlots'
 import type { Item } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
-// 12s is plenty for a small chat completion on Featherless; longer than that means
-// the network is wedged and the user should get a rules-engine fallback instead
-// of staring at a spinner.
 const FEATHERLESS_TIMEOUT_MS = 12_000
-
-const SYSTEM_PROMPT = `You are Milli, DripCheck\'s personal AI stylist. Warm, confident, Gen-Z voice, max 2 sentences. You ONLY pick from provided items — never invent garments. Reply ONLY with raw JSON, no markdown fences: {"top_id":"","bottom_id":"","shoes_id":"","outer_id":null,"explanation":""}`
-
 const FEATHERLESS_URL = 'https://api.featherless.ai/v1/chat/completions'
 
-interface StylistRequestBody {
-  occasion?: string
-  temp?: number | null
-  note?: string
-}
+const SYSTEM_PROMPT = `You are the DripCheck stylist. Warm, confident, concise — max 2 sentences. You MUST pick only from the provided wardrobe items. Never invent garments. Slots are strict: top_id must be a top, bottom_id a bottom, shoes_id shoes, outer_id an outer layer or null. Prefer clean items that suit the temperature and occasion. Reply with raw JSON only, no markdown: {"top_id":"","bottom_id":"","shoes_id":"","outer_id":null,"explanation":""}`
 
 interface AiResponse {
   top_id?: string
@@ -32,146 +43,213 @@ interface AiResponse {
   explanation?: string
 }
 
-function clampExplanation(s: string | undefined): string {
-  if (!s) return ''
-  const trimmed = s.trim()
-  return trimmed.length <= 240 ? trimmed : trimmed.slice(0, 237) + '…'
+function clampExplanation(value: string | undefined): string {
+  if (!value) return ''
+  const trimmed = value.trim()
+  return trimmed.length <= 240 ? trimmed : `${trimmed.slice(0, 237)}…`
 }
 
-function stripJsonFences(s: string): string {
-  // Some models wrap JSON in ```json fences despite instructions.
-  return s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
-}
-
-function tryParseJson(s: string): AiResponse | null {
+function parseAiJson(raw: string): AiResponse | null {
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
   try {
-    const obj = JSON.parse(s)
-    return typeof obj === 'object' && obj ? (obj as AiResponse) : null
+    const parsed = JSON.parse(cleaned)
+    return parsed && typeof parsed === 'object' ? (parsed as AiResponse) : null
   } catch {
-    // Some models return a trailing comma or extra prose — try a forgiving slice.
-    const m = s.match(/\{[\s\S]*\}/)
-    if (m) {
-      try { return JSON.parse(m[0]) as AiResponse } catch { return null }
+    const object = cleaned.match(/\{[\s\S]*\}/)
+    if (!object) return null
+    try {
+      return JSON.parse(object[0]) as AiResponse
+    } catch {
+      return null
     }
-    return null
   }
 }
 
-function validate(out: AiResponse | null, items: Item[]): { ok: true; ids: string[]; explanation: string } | { ok: false; reason: string } {
-  if (!out) return { ok: false, reason: 'unparseable' }
-  const ids = new Set(items.map(i => i.id))
-  if (!out.top_id || !ids.has(out.top_id))         return { ok: false, reason: 'bad_top_id' }
-  if (!out.bottom_id || !ids.has(out.bottom_id))   return { ok: false, reason: 'bad_bottom_id' }
-  if (!out.shoes_id || !ids.has(out.shoes_id))     return { ok: false, reason: 'bad_shoes_id' }
-  if (out.outer_id && !ids.has(out.outer_id))       return { ok: false, reason: 'bad_outer_id' }
-  return { ok: true, ids: [out.top_id, out.bottom_id, out.shoes_id, ...(out.outer_id ? [out.outer_id] : [])], explanation: clampExplanation(out.explanation) }
+function validateAi(
+  result: AiResponse | null,
+  items: Item[]
+): { ok: true; ordered: string[]; explanation: string } | { ok: false; reason: string } {
+  if (!result) return { ok: false, reason: 'unparseable' }
+  const ids = [result.top_id, result.bottom_id, result.shoes_id].filter(
+    (id): id is string => typeof id === 'string'
+  )
+  if (ids.length !== 3) return { ok: false, reason: 'missing_slots' }
+  if (result.outer_id) ids.push(result.outer_id)
+
+  // Category + ownership guard. A top can never occupy the bottom slot.
+  const ordered = orderOutfitIds(items, ids)
+  if (!ordered) return { ok: false, reason: 'bad_slots' }
+
+  const byId = new Map(items.map(item => [item.id, item]))
+  if (ordered.some(id => byId.get(id)?.status === 'dirty')) {
+    return { ok: false, reason: 'dirty_item' }
+  }
+
+  return { ok: true, ordered, explanation: clampExplanation(result.explanation) }
 }
 
-async function callFeatherless(messages: { role: 'system' | 'user'; content: string }[]): Promise<string> {
-  const apiKey = process.env.FEATHERLESS_API_KEY
-  const model  = process.env.FEATHERLESS_MODEL || 'featherless-ai/Qwen2.5-7B-Instruct'
-  // AbortController kills the socket if Featherless hangs. Caller treats the
-  // AbortError like any other failure and falls through to the rules engine,
-  // so a slow network never breaks the user experience.
+async function callFeatherless(messages: { role: 'system' | 'user'; content: string }[]) {
+  const env = getServerEnv()
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FEATHERLESS_TIMEOUT_MS)
   try {
-    const r = await fetch(FEATHERLESS_URL, {
+    const response = await fetch(FEATHERLESS_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${env.FEATHERLESS_API_KEY}`,
       },
-      body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 300 }),
+      body: JSON.stringify({
+        model: env.FEATHERLESS_MODEL || 'featherless-ai/Qwen2.5-7B-Instruct',
+        messages,
+        temperature: 0.4,
+        max_tokens: 300,
+      }),
       signal: controller.signal,
     })
-    if (!r.ok) throw new Error(`featherless_${r.status}`)
-    const data = await r.json()
-    return data?.choices?.[0]?.message?.content ?? ''
+    if (!response.ok) throw new Error(`featherless_${response.status}`)
+    const data = await response.json()
+    return (data?.choices?.[0]?.message?.content ?? '') as string
   } finally {
     clearTimeout(timer)
   }
 }
 
 export async function POST(req: NextRequest) {
-  let body: StylistRequestBody = {}
-  try { body = (await req.json()) as StylistRequestBody } catch { /* allow empty */ }
-  const occasion = (body.occasion || 'casual').toString()
-  const temp     = typeof body.temp === 'number' ? body.temp : null
-  const note     = (body.note || '').toString().slice(0, 280)
+  const auth = await getAuth()
+  if (!auth) return unauthorized()
 
-  // 1. Auth is optional while the app is publicly accessible. Anonymous users
-  // receive an empty wardrobe response instead of being redirected to login.
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const limit = rateLimitPair(auth.user.id, 'stylist', 30, 300)
+  if (!limit.ok) return tooMany(limit)
+
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    body = {}
+  }
+
+  const parsed = stylistRequestSchema.safeParse(body)
+  if (!parsed.success) return badRequest('invalid_request')
+  const input = parsed.data
+
+  const occasion = input.occasion ?? 'casual'
+  const temp = input.temp ?? null
+  const note = input.note ?? ''
+
+  const [itemsResult, recentResult, profileResult] = await Promise.all([
+    auth.supabase.from('items').select('*').eq('user_id', auth.user.id),
+    auth.supabase
+      .from('outfits')
+      .select('item_ids')
+      .eq('user_id', auth.user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    auth.supabase.from('users').select('silhouette').eq('id', auth.user.id).maybeSingle(),
+  ])
+
+  if (itemsResult.error) {
+    logServerError('stylist:items', itemsResult.error)
+    return serverError('could_not_load')
+  }
+
+  const items = ((itemsResult.data ?? []) as Record<string, unknown>[]).map(normalizeItem)
+  if (items.length < 3) {
     return NextResponse.json({ error: 'not_enough_items' }, { status: 422 })
   }
 
-  // 2. Items
-  const { data: items } = await supabase
-    .from('items')
-    .select('*')
-    .eq('user_id', user.id)
-  if (!items || items.length < 3) {
-    return NextResponse.json({ error: 'not_enough_items' }, { status: 422 })
-  }
+  const recentCombos = ((recentResult.data ?? []) as { item_ids?: string[] }[])
+    .map(row => row.item_ids ?? [])
+    .filter(ids => ids.length > 0)
+  const recentItemIds = Array.from(new Set(recentCombos.flat()))
+  const silhouette = (profileResult.data?.silhouette ?? null) as SilhouettePreference
 
-  // 3. Recent combinations (deduped item_ids from last 5 outfits)
-  const { data: recent } = await supabase
-    .from('outfits')
-    .select('item_ids')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(5)
-  const recentItemIds: string[] = Array.from(new Set((recent ?? []).flatMap(o => o.item_ids ?? [])))
+  const options: EngineOptions = { recentItemIds, recentCombos, silhouette }
 
-  // 4. Rules path (always available, used as the fallback)
-  const rulesCombo = generateOutfit(items as Item[], temp, occasion, recentItemIds)
+  const rulesCombo = generateOutfit(items, temp, occasion, options)
   if (!rulesCombo) {
     return NextResponse.json({ error: 'no_outfit_possible' }, { status: 422 })
   }
-  const rulesResult = {
+
+  const rulesOrdered = [
+    rulesCombo.top.id,
+    rulesCombo.bottom.id,
+    rulesCombo.shoes.id,
+    ...(rulesCombo.outerwear ? [rulesCombo.outerwear.id] : []),
+  ]
+
+  const rulesResponse = {
     source: 'rules' as const,
-    item_ids: [rulesCombo.top.id, rulesCombo.bottom.id, rulesCombo.shoes.id, ...(rulesCombo.outerwear ? [rulesCombo.outerwear.id] : [])],
-    explanation: getTemplateExplanation(rulesCombo),
+    item_ids: rulesOrdered,
+    explanation: explainOutfit(rulesCombo, temp, occasion),
+    match: matchPercent(rulesCombo.score),
+    occasion,
   }
 
-  // 5. AI path
-  if (!process.env.FEATHERLESS_API_KEY) {
-    return NextResponse.json(rulesResult)
-  }
+  const apiKey = getServerEnv().FEATHERLESS_API_KEY
+  if (!apiKey) return NextResponse.json(rulesResponse)
 
-  const userPayload = JSON.stringify({
-    items: items.map(i => ({
-      id: i.id, name: i.name, category: i.category,
-      primary_color: i.primary_color, formality: i.formality, warmth: i.warmth,
+  const payload = JSON.stringify({
+    items: items.map(item => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      primary_color: item.primary_color,
+      formality: item.formality,
+      warmth: item.warmth,
+      status: item.status,
+      fit: item.fit,
     })),
     temperature: temp,
     occasion,
     note,
-    recent_combinations: recentItemIds,
+    recent_combinations: recentCombos,
   })
 
   try {
-    const first  = await callFeatherless([{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userPayload }])
-    const parsed = tryParseJson(stripJsonFences(first))
-    const v1     = validate(parsed, items as Item[])
-    if (v1.ok) {
-      return NextResponse.json({ source: 'ai', item_ids: v1.ids, explanation: v1.explanation })
+    const first = await callFeatherless([
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: payload },
+    ])
+    const checked = validateAi(parseAiJson(first), items)
+    if (checked.ok) {
+      const combo = comboFromIds(items, checked.ordered)
+      if (combo) {
+        return NextResponse.json({
+          source: 'ai',
+          item_ids: checked.ordered,
+          explanation: checked.explanation || explainOutfit(combo, temp, occasion),
+          match: matchPercent(scoreCombo(combo.top, combo.bottom, combo.shoes, combo.outerwear, temp, occasion, options)),
+          occasion,
+        })
+      }
     }
-    // One retry with explicit correction
+
     const second = await callFeatherless([
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userPayload },
-      { role: 'user', content: 'Your previous reply was invalid. Return ONLY valid JSON matching the schema, no markdown, no commentary.' },
+      { role: 'user', content: payload },
+      {
+        role: 'user',
+        content:
+          'Your previous reply was invalid. Return ONLY valid JSON matching the schema. IDs must match the provided wardrobe and their categories must match the slot.',
+      },
     ])
-    const v2 = validate(tryParseJson(stripJsonFences(second)), items as Item[])
-    if (v2.ok) {
-      return NextResponse.json({ source: 'ai', item_ids: v2.ids, explanation: v2.explanation })
+    const retried = validateAi(parseAiJson(second), items)
+    if (retried.ok) {
+      const combo = comboFromIds(items, retried.ordered)
+      if (combo) {
+        return NextResponse.json({
+          source: 'ai',
+          item_ids: retried.ordered,
+          explanation: retried.explanation || explainOutfit(combo, temp, occasion),
+          match: matchPercent(scoreCombo(combo.top, combo.bottom, combo.shoes, combo.outerwear, temp, occasion, options)),
+          occasion,
+        })
+      }
     }
-  } catch {
-    // fall through to rules — includes AbortError (timeout), network, parse
+  } catch (error) {
+    logServerError('stylist:ai', error)
   }
-  return NextResponse.json(rulesResult)
+
+  return NextResponse.json(rulesResponse)
 }

@@ -1,0 +1,482 @@
+/* App-level layouts built on the design system. No new colours: only tokens. */
+
+/* Empty, loading and error panels ------------------------------------------ */
+.empty {
+  margin: 26px 20px;
+  padding: 28px 22px;
+  border-radius: 18px;
+  background: var(--s1);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.empty-eyebrow {
+  margin: 0;
+  font: 700 11px var(--f);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.empty h2 {
+  font: 800 34px/0.9 var(--disp);
+  font-stretch: 68%;
+  text-transform: uppercase;
+  margin: 0;
+}
+.empty p {
+  margin: 0;
+  color: var(--mu);
+  font-size: 15px;
+  line-height: 1.45;
+  max-width: 32ch;
+}
+.empty .btn {
+  width: auto;
+  min-width: 200px;
+  margin-top: 8px;
+  padding: 0 22px;
+}
+
+/* Header row with an action ------------------------------------------------ */
+.ltrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ltrow .try {
+  flex: none;
+  margin-top: 8px;
+}
+
+/* Photos ------------------------------------------------------------------- */
+.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.avfill {
+  height: 100%;
+  width: 100%;
+}
+
+/* Tiny garment chip: let the SVG lay out as a direct child. */
+.bareflat {
+  display: contents;
+}
+
+/* Chat error --------------------------------------------------------------- */
+.chat-error {
+  margin: 8px 6px 0;
+  color: var(--mu);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+/* Week preview sheet ------------------------------------------------------- */
+.week-preview {
+  height: min(46svh, 360px);
+  margin: 0 20px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--ph), var(--ph2));
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  padding: 14px;
+}
+.week-preview .fg {
+  height: 100%;
+  transform: none;
+}
+.week-why {
+  margin: 0 22px 16px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--mu);
+}
+
+/* Sheet actions ------------------------------------------------------------ */
+.sheet-actions {
+  margin: 10px 20px 0;
+  background: var(--s1);
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+  overflow: hidden;
+}
+.rw.danger .t {
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+}
+
+/* You screen --------------------------------------------------------------- */
+.sg.wide {
+  width: 100%;
+}
+.city-row:focus-within {
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.cityinput {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+  background: none;
+}
+.cityinput:focus {
+  outline: 0;
+}
+.you-save {
+  display: block;
+  margin: 10px 14px 0;
+  width: calc(100% - 28px);
+  min-height: 48px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+}
+.you-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Login -------------------------------------------------------------------- */
+.login {
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+  display: flex;
+  justify-content: center;
+  padding: 0 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.login-inner {
+  width: 100%;
+  max-width: 430px;
+  padding: calc(28px + env(safe-area-inset-top, 0px)) 0
+    calc(32px + env(safe-area-inset-bottom, 0px));
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: clamp(32px, 9vh, 72px);
+}
+.login-mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--bk);
+  color: var(--hi);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.login-mark svg {
+  width: 26px;
+  height: 26px;
+}
+.login-word {
+  font: 800 26px/1 var(--disp);
+  font-stretch: 68%;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+.login-word em {
+  font-style: normal;
+  color: var(--bk);
+}
+.login-title {
+  font: 800 clamp(48px, 13vw, 64px)/0.88 var(--disp);
+  font-stretch: 68%;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+  margin: 0;
+}
+.login-title em {
+  font-style: normal;
+  color: var(--mu);
+}
+.login-sub {
+  margin-top: 18px;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--mu);
+  max-width: 36ch;
+}
+.login-card {
+  margin-top: clamp(26px, 6vh, 44px);
+  background: var(--s1);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+.login-card label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mu);
+  margin-bottom: 8px;
+}
+.login-card input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: 16px;
+}
+.login-card input:focus {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.login-btn {
+  width: 100%;
+  margin-top: 14px;
+}
+.login-msg {
+  margin: 14px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ok);
+}
+.login-msg.err {
+  color: var(--ink);
+  font-weight: 600;
+}
+.login-fine {
+  margin: 18px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--mu);
+}
+.login-foot {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.login code {
+  background: var(--s2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* Add flow ----------------------------------------------------------------- */
+.add-scroll {
+  padding-bottom: calc(var(--tb) + 40px);
+}
+.add-head {
+  position: relative;
+  padding-right: 64px;
+}
+.add-close {
+  position: absolute;
+  right: 20px;
+  top: 26px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--s1);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  display: grid;
+  place-items: center;
+}
+.add-close svg {
+  width: 20px;
+  height: 20px;
+}
+.add-tabs {
+  margin-top: 0;
+}
+.add-drop {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin: 0 20px;
+  height: clamp(220px, 34svh, 300px);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--ph), var(--ph2));
+  overflow: hidden;
+  cursor: pointer;
+}
+.add-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.add-drop-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #3a3529;
+  text-align: center;
+  padding: 20px;
+}
+.add-drop-empty b {
+  font-size: 16px;
+}
+.add-drop-empty small {
+  font-size: 13px;
+  color: #4d4739;
+}
+.add-drop-empty svg {
+  width: 34px;
+  height: 34px;
+}
+.add-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.add-replace {
+  display: block;
+  margin: 10px auto 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 4px;
+  min-height: 44px;
+}
+.add-status {
+  margin: 14px 22px 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--mu);
+}
+.add-status.err {
+  color: var(--ink);
+  font-weight: 600;
+}
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 20px 0;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.field > span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.field input {
+  height: 52px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--s1);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: 16px;
+}
+.field input:focus {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.catgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.catgrid button {
+  min-height: 46px;
+  border-radius: 12px;
+  background: var(--s1);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--mu);
+  text-align: center;
+}
+.catgrid button.on {
+  background: var(--bk);
+  color: var(--hi);
+  box-shadow: none;
+}
+.add-submit {
+  margin-top: 6px;
+  width: 100%;
+}
+.add-scan {
+  padding: 18px 20px 0;
+}
+.add-scan-title {
+  font: 800 30px/0.92 var(--disp);
+  font-stretch: 68%;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+.scan-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 16px;
+}
+.scan-name:focus {
+  outline: 0;
+}
+.scan-cat {
+  flex: none;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--s2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.scan-cat:focus {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+.add-empty-state {
+  margin: 24px 20px 0;
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--s1);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  text-align: center;
+}
+.add-empty-state h2 {
+  font: 800 30px/0.92 var(--disp);
+  font-stretch: 68%;
+  text-transform: uppercase;
+}
+.add-empty-state p {
+  margin-top: 10px;
+  color: var(--mu);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+@media (min-width: 520px) {
+  .login-inner {
+    padding-top: calc(var(--top) + 24px);
+  }
+}
