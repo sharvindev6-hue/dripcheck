@@ -1,12 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getPublicEnv } from './env'
 
 export async function createClient() {
+  const env = getPublicEnv()
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
@@ -18,7 +20,8 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // In middleware context
+            // Called from a Server Component: cookies are read-only there.
+            // Session refresh is handled by middleware instead.
           }
         },
       },
