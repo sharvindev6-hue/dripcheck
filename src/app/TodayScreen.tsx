@@ -691,10 +691,10 @@ export default function TodayScreen() {
               <input
                 value={ask}
                 onChange={event => setAsk(event.target.value)}
-                placeholder="Ask your stylist for a change"
+                placeholder="Ask Milli anything"
                 autoComplete="off"
                 enterKeyHint="send"
-                aria-label="Ask your stylist"
+                aria-label="Ask Milli"
               />
               <button className="snd" type="submit" aria-label="Send">
                 <SendIcon size={20} />

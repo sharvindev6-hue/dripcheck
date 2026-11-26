@@ -180,7 +180,7 @@ export default function ClosetPage() {
           <div className="empty">
             <p className="empty-eyebrow">Empty rail</p>
             <h2>Your closet is waiting.</h2>
-            <p>Add a few pieces and the stylist starts building complete looks from what you own.</p>
+            <p>Add a few pieces and Milli starts building complete looks from what you own.</p>
             <Link href="/add" className="btn pri">
               Add your first piece
             </Link>

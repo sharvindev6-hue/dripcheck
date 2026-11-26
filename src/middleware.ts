@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getPublicEnv, hasPublicEnv } from '@/lib/env'
+import { requestOrigin } from '@/lib/requestOrigin'
 
 const PUBLIC_PAGES = new Set(['/login'])
 const PUBLIC_API_PREFIXES = ['/api/auth', '/api/health']
@@ -30,7 +31,7 @@ export async function middleware(request: NextRequest) {
     !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
   ) {
     const origin = request.headers.get('origin')
-    if (origin && origin !== new URL(request.url).origin) {
+    if (origin && origin !== requestOrigin(request)) {
       return NextResponse.json({ error: 'bad_origin' }, { status: 403 })
     }
   }
@@ -69,7 +70,7 @@ export async function middleware(request: NextRequest) {
 
   if (isPublic(pathname)) {
     if (user && pathname === '/login') {
-      return NextResponse.redirect(new URL('/', request.url))
+      return NextResponse.redirect(new URL('/', requestOrigin(request)))
     }
     return response
   }
@@ -78,7 +79,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith('/api')) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
-    const login = new URL('/login', request.url)
+    const login = new URL('/login', requestOrigin(request))
     login.searchParams.set('next', safeNext(`${pathname}${request.nextUrl.search}`))
     return NextResponse.redirect(login)
   }

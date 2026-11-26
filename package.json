@@ -15,11 +15,13 @@
     "verify:engine": "tsx scripts/verify-engine.ts"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.2",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.109.0",
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18",
+    "sharp": "^0.35.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {

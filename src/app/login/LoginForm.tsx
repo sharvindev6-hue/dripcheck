@@ -20,14 +20,20 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [nextPath, setNextPath] = useState('/')
   const configured = hasPublicEnv()
+  const isDevelopment = process.env.NODE_ENV === 'development'
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const next = safeNext(params.get('next'))
     setNextPath(next)
 
-    if (params.get('error')) {
-      setError('That sign-in link did not work. Send a fresh one.')
+    const errorCode = params.get('error')
+    if (errorCode) {
+      setError(
+        errorCode === 'demo'
+          ? 'Demo sign-in is unavailable. Check the local Supabase and demo env values.'
+          : 'That sign-in link did not work. Send a fresh one.'
+      )
     }
 
     if (!configured) return
@@ -150,6 +156,20 @@ export default function LoginForm() {
             <p className="login-msg err" role="alert">
               {error}
             </p>
+          ) : null}
+
+          {isDevelopment ? (
+            <div className="login-demo">
+              <p className="login-demo-or">or</p>
+              <form action="/api/auth/demo" method="post">
+                <button type="submit" className="btn sec login-demo-btn">
+                  Use the demo closet
+                </button>
+              </form>
+              <p className="login-fine">
+                Development only. Signs in as the seeded demo account.
+              </p>
+            </div>
           ) : null}
 
           <p className="login-fine">

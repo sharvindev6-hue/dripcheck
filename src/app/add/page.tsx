@@ -60,7 +60,19 @@ export default function AddPage() {
 
   const [mode, setMode] = useState<'one' | 'outfit'>('one')
   const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [originalPreview, setOriginalPreview] = useState<string | null>(null)
+  const [cutoutPreview, setCutoutPreview] = useState<string | null>(null)
+  const [cutout, setCutout] = useState<{
+    blob: Blob
+    quality: 'ok' | 'review'
+    coverage: number
+    model: string
+  } | null>(null)
+  const [cutoutStatus, setCutoutStatus] = useState<
+    'idle' | 'processing' | 'ready' | 'review' | 'failed'
+  >('idle')
+  const [cutoutNotice, setCutoutNotice] = useState<string | null>(null)
+  const [useOriginal, setUseOriginal] = useState(false)
   const [tag, setTag] = useState<Tag>(EMPTY_TAG)
   const [price, setPrice] = useState('')
   const [scanned, setScanned] = useState<Tag[] | null>(null)
@@ -69,12 +81,22 @@ export default function AddPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const cutoutRequest = useRef(0)
+
+  const preview = useOriginal ? originalPreview : cutoutPreview ?? originalPreview
+  const showingCutout = Boolean(cutout && cutoutPreview && !useOriginal)
 
   useEffect(() => {
     return () => {
-      if (preview) URL.revokeObjectURL(preview)
+      if (originalPreview) URL.revokeObjectURL(originalPreview)
     }
-  }, [preview])
+  }, [originalPreview])
+
+  useEffect(() => {
+    return () => {
+      if (cutoutPreview) URL.revokeObjectURL(cutoutPreview)
+    }
+  }, [cutoutPreview])
 
   const setFileSafe = (next: File) => {
     const extension = next.name.split('.').pop()?.toLowerCase() ?? ''
@@ -91,15 +113,24 @@ export default function AddPage() {
       return
     }
 
-    if (preview) URL.revokeObjectURL(preview)
     setFile(next)
-    setPreview(URL.createObjectURL(next))
+    setOriginalPreview(URL.createObjectURL(next))
+    setCutout(null)
+    setCutoutPreview(null)
+    setCutoutStatus('idle')
+    setCutoutNotice(null)
+    setUseOriginal(false)
+    // A new photo must never inherit tags or a price from the previous one.
+    setTag(EMPTY_TAG)
+    setPrice('')
     setError(null)
     setNotice(null)
     setScanned(null)
+    cutoutRequest.current += 1
 
     if (mode === 'one') {
       void analyzeOne(next)
+      void cutoutOne(next, cutoutRequest.current)
     } else {
       void analyzeOutfit(next)
     }
@@ -153,20 +184,75 @@ export default function AddPage() {
     }
   }
 
-  const uploadPhoto = async (photo: File): Promise<string> => {
+  const cutoutOne = async (photo: File, requestId: number) => {
+    setCutoutStatus('processing')
+    setCutoutNotice('Removing the background… the first cutout can take a minute while the model loads.')
+    try {
+      const form = new FormData()
+      form.append('file', photo)
+      const response = await fetch('/api/cutout', { method: 'POST', body: form })
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        if (requestId !== cutoutRequest.current) return
+        setCutoutStatus('failed')
+        setCutoutNotice(
+          data?.error === 'cutout_empty'
+            ? 'Could not separate the piece from the background. Try a clearer photo with more contrast; this one will use the original.'
+            : 'Background removal is unavailable; this piece will use the original photo.'
+        )
+        return
+      }
+
+      const blob = await response.blob()
+      if (requestId !== cutoutRequest.current) return
+
+      const quality = response.headers.get('X-Cutout-Quality') === 'review' ? 'review' : 'ok'
+      const coverage = Number(response.headers.get('X-Cutout-Coverage') ?? '')
+      setCutout({
+        blob,
+        quality,
+        coverage: Number.isFinite(coverage) ? coverage : 0,
+        model: response.headers.get('X-Cutout-Model') ?? 'birefnet-lite-512',
+      })
+      setCutoutPreview(URL.createObjectURL(blob))
+      setUseOriginal(false)
+      setCutoutStatus(quality === 'review' ? 'review' : 'ready')
+      setCutoutNotice(
+        quality === 'review'
+          ? 'Check the edges before saving — this photo may need a cleaner flat lay or a retry.'
+          : 'Cream background ready. Check the edges before saving.'
+      )
+    } catch {
+      if (requestId !== cutoutRequest.current) return
+      setCutoutStatus('failed')
+      setCutoutNotice('Background removal is offline; this piece will use the original photo.')
+    }
+  }
+
+  const skipCutout = () => {
+    cutoutRequest.current += 1
+    setCutout(null)
+    setCutoutPreview(null)
+    setCutoutStatus('idle')
+    setCutoutNotice('Using the original photo.')
+    setUseOriginal(true)
+  }
+
+  const uploadPhoto = async (photo: Blob, name = 'photo.png'): Promise<string> => {
     const supabase = createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) throw new Error('not authenticated')
 
-    const extension = photo.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-    const safeExtension = EXTENSIONS.includes(extension) ? extension : 'jpg'
+    const upload = photo instanceof File ? photo : new File([photo], name, { type: photo.type })
+    const extension = name.split('.').pop()?.toLowerCase() ?? 'png'
+    const safeExtension = EXTENSIONS.includes(extension) ? extension : 'png'
     const path = `${user.id}/${crypto.randomUUID()}.${safeExtension}`
 
     const { error: uploadError } = await supabase.storage
       .from('wardrobe-items')
-      .upload(path, photo, { contentType: uploadMime(photo), upsert: false })
+      .upload(path, upload, { contentType: uploadMime(upload), upsert: false })
 
     if (uploadError) throw uploadError
     return path
@@ -182,7 +268,11 @@ export default function AddPage() {
       let imagePath: string | null = null
       if (file) {
         try {
-          imagePath = await uploadPhoto(file)
+          const uploadFile =
+            cutout && !useOriginal
+              ? new File([cutout.blob], 'cutout.png', { type: 'image/png' })
+              : file
+          imagePath = await uploadPhoto(uploadFile, uploadFile.name)
         } catch (uploadError) {
           console.error('[dripcheck:add] photo upload failed', uploadError)
           setNotice('The photo could not upload, so this piece will use the drawn flat instead.')
@@ -301,6 +391,12 @@ export default function AddPage() {
               setScanned(null)
               setError(null)
               setNotice(null)
+              cutoutRequest.current += 1
+              setCutout(null)
+              setCutoutPreview(null)
+              setCutoutStatus('idle')
+              setCutoutNotice(null)
+              setUseOriginal(false)
             }}
           >
             One piece
@@ -313,6 +409,12 @@ export default function AddPage() {
               setScanned(null)
               setError(null)
               setNotice(null)
+              cutoutRequest.current += 1
+              setCutout(null)
+              setCutoutPreview(null)
+              setCutoutStatus('idle')
+              setCutoutNotice(null)
+              setUseOriginal(false)
             }}
           >
             Whole outfit
@@ -334,12 +436,17 @@ export default function AddPage() {
           {preview ? (
             // Object URLs cannot go through next/image.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={preview} alt="Selected clothing" className="add-preview" />
+            <img
+              src={preview}
+              alt={showingCutout ? 'Clothing cut out on a cream background' : 'Selected clothing'}
+              className={showingCutout ? 'add-preview cutout' : 'add-preview'}
+            />
           ) : (
             <span className="add-drop-empty">
               <CameraIcon size={34} />
               <b>Take or choose a photo</b>
               <small>JPG, PNG, WebP or HEIC · up to 4MB</small>
+              <small>Lay it flat or hang it for the cleanest cream cutout.</small>
             </span>
           )}
         </label>
@@ -349,8 +456,28 @@ export default function AddPage() {
             Choose another photo
           </button>
         ) : null}
+        {cutout ? (
+          <button
+            type="button"
+            className="add-replace"
+            aria-pressed={useOriginal}
+            onClick={() => setUseOriginal(previous => !previous)}
+          >
+            {useOriginal ? 'Use cream cutout' : 'Use original photo'}
+          </button>
+        ) : null}
+        {file && cutoutStatus === 'processing' ? (
+          <button type="button" className="add-replace" onClick={skipCutout}>
+            Use the original photo instead
+          </button>
+        ) : null}
 
         {analyzing ? <p className="add-status">Reading the photo…</p> : null}
+        {mode === 'one' && cutoutNotice ? (
+          <p className={cutoutStatus === 'failed' ? 'add-status err' : 'add-status'}>
+            {cutoutNotice}
+          </p>
+        ) : null}
         {notice ? <p className="add-status">{notice}</p> : null}
         {error ? <p className="add-status err" role="alert">{error}</p> : null}
 
@@ -442,7 +569,13 @@ export default function AddPage() {
               className="btn pri add-submit"
               disabled={saving || !tag.name.trim()}
             >
-              {saving ? 'Saving…' : file ? 'Add to closet' : 'Add without a photo'}
+              {saving
+                ? 'Saving…'
+                : file && cutoutStatus === 'processing'
+                  ? 'Add with original photo'
+                  : file
+                    ? 'Add to closet'
+                    : 'Add without a photo'}
             </button>
           </form>
         ) : scanned ? (

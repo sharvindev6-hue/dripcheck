@@ -7,9 +7,15 @@ import type { Item } from '@/types'
 export const GEMINI_MODEL = 'gemini-1.5-flash-latest'
 export const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
 
+export const NVIDIA_NIM_URL = 'https://integrate.api.nvidia.com/v1/chat/completions'
+export const NVIDIA_DEFAULT_VISION_MODEL = 'nvidia/nemotron-3.5-super-vl-120b-a12b'
+
 // Keep below the common 4.5 MB serverless request ceiling.
 export const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 export const GEMINI_TIMEOUT_MS = 15_000
+// Keep the NVIDIA attempt short enough that the Gemini fallback still fits
+// inside the route's maxDuration.
+export const NVIDIA_TIMEOUT_MS = 20_000
 
 export const ALLOWED_IMAGE_MIME = new Set([
   'image/jpeg',
@@ -186,6 +192,63 @@ export async function callGeminiJson(
         ok: false,
         status: 502,
         error: finish && finish !== 'STOP' ? `gemini_finish_${String(finish).toLowerCase()}` : 'empty_response',
+      }
+    }
+    return { ok: true, text }
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'AbortError'
+    return { ok: false, status: timedOut ? 504 : 502, error: timedOut ? 'timeout' : 'network' }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/** NVIDIA NIM is OpenAI-compatible and accepts the image as a data URL. */
+export async function callNvidiaVisionJson(
+  apiKey: string,
+  model: string,
+  mimeType: string,
+  base64: string,
+  prompt: string
+): Promise<GeminiResult | GeminiFailure> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), NVIDIA_TIMEOUT_MS)
+  try {
+    const response = await fetch(NVIDIA_NIM_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+            ],
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 800,
+      }),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      return { ok: false, status: 502, error: `nvidia_${response.status}` }
+    }
+
+    const data = await response.json()
+    const text: unknown = data?.choices?.[0]?.message?.content
+    if (typeof text !== 'string' || !text.trim()) {
+      const finish = data?.choices?.[0]?.finish_reason
+      return {
+        ok: false,
+        status: 502,
+        error: finish && finish !== 'stop' ? `nvidia_finish_${String(finish).toLowerCase()}` : 'empty_response',
       }
     }
     return { ok: true, text }

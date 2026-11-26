@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { logServerError } from '@/lib/api'
+import { requestOrigin } from '@/lib/requestOrigin'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,8 +23,10 @@ export async function GET(request: NextRequest) {
   const next = safeNext(url.searchParams.get('next'))
   const error = url.searchParams.get('error')
 
+  const origin = requestOrigin(request)
+
   if (error) {
-    return NextResponse.redirect(new URL('/login?error=auth', request.url))
+    return NextResponse.redirect(new URL('/login?error=auth', origin))
   }
 
   const supabase = await createClient().catch(configError => {
@@ -31,7 +34,7 @@ export async function GET(request: NextRequest) {
     return null
   })
   if (!supabase) {
-    return NextResponse.redirect(new URL('/login?error=config', request.url))
+    return NextResponse.redirect(new URL('/login?error=config', origin))
   }
 
   const code = url.searchParams.get('code')
@@ -40,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-    if (!exchangeError) return NextResponse.redirect(new URL(next, request.url))
+    if (!exchangeError) return NextResponse.redirect(new URL(next, origin))
     logServerError('auth:exchange', exchangeError)
   }
 
@@ -50,9 +53,9 @@ export async function GET(request: NextRequest) {
       token_hash: tokenHash,
       type: type as 'magiclink' | 'email' | 'signup' | 'recovery' | 'invite' | 'email_change',
     })
-    if (!otpError) return NextResponse.redirect(new URL(next, request.url))
+    if (!otpError) return NextResponse.redirect(new URL(next, origin))
     logServerError('auth:verify-otp', otpError)
   }
 
-  return NextResponse.redirect(new URL('/login?error=auth', request.url))
+  return NextResponse.redirect(new URL('/login?error=auth', origin))
 }

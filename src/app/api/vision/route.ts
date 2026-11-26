@@ -14,14 +14,17 @@ import { rateLimitPair } from '@/lib/rate-limit'
 import { getServerEnv } from '@/lib/env'
 import {
   callGeminiJson,
+  callNvidiaVisionJson,
   clampTag,
+  NVIDIA_DEFAULT_VISION_MODEL,
   parseJsonLoose,
   readUpload,
   SINGLE_ITEM_PROMPT,
 } from '@/lib/vision'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+// NVIDIA (20s) plus a Gemini retry (15s) must fit inside one invocation.
+export const maxDuration = 45
 
 export async function POST(req: NextRequest) {
   const auth = await getAuth()
@@ -42,21 +45,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ suggestedTags: null, error: upload.error }, { status: upload.status })
   }
 
-  const apiKey = getServerEnv().GEMINI_API_KEY
-  if (!apiKey) {
+  const env = getServerEnv()
+  const nvidiaKey = env.NVIDIA_NIM_API_KEY
+  const geminiKey = env.GEMINI_API_KEY
+  if (!nvidiaKey && !geminiKey) {
     return NextResponse.json({ suggestedTags: null, error: 'no_key' }, { status: 503 })
   }
 
-  const bytes = Buffer.from(await upload.file.arrayBuffer())
-  const result = await callGeminiJson(
-    apiKey,
-    upload.mime,
-    bytes.toString('base64'),
-    SINGLE_ITEM_PROMPT
-  )
+  const base64 = Buffer.from(await upload.file.arrayBuffer()).toString('base64')
+
+  let result: Awaited<ReturnType<typeof callGeminiJson>>
+  if (nvidiaKey) {
+    result = await callNvidiaVisionJson(
+      nvidiaKey,
+      env.NVIDIA_NIM_VISION_MODEL || NVIDIA_DEFAULT_VISION_MODEL,
+      upload.mime,
+      base64,
+      SINGLE_ITEM_PROMPT
+    )
+    if (!result.ok && geminiKey) {
+      logServerError('vision:nvidia', result.error)
+      result = await callGeminiJson(geminiKey, upload.mime, base64, SINGLE_ITEM_PROMPT)
+    }
+  } else if (geminiKey) {
+    result = await callGeminiJson(geminiKey, upload.mime, base64, SINGLE_ITEM_PROMPT)
+  } else {
+    return NextResponse.json({ suggestedTags: null, error: 'no_key' }, { status: 503 })
+  }
 
   if (!result.ok) {
-    logServerError('vision:gemini', result.error)
+    logServerError('vision:ai', result.error)
     return NextResponse.json(
       { suggestedTags: null, error: result.error },
       { status: result.status }

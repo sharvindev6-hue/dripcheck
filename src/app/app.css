@@ -247,6 +247,27 @@
   width: 100%;
   margin-top: 14px;
 }
+.login-demo {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}
+.login-demo-or {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mu);
+}
+.login-demo-btn {
+  width: 100%;
+}
+.login-demo .login-fine {
+  margin-top: 10px;
+  text-align: center;
+}
 .login-msg {
   margin: 14px 0 0;
   font-size: 14px;
@@ -348,6 +369,10 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.add-preview.cutout {
+  object-fit: contain;
+  background: var(--bg);
 }
 .add-replace {
   display: block;

@@ -67,7 +67,7 @@ export default function Chat({
       const weather = typeof temp === 'number' ? `It is ${temp}°` : 'Weather is offline'
       push(
         'assistant',
-        `Morning. ${weather}${condition ? ` and ${condition}` : ''}. This is your ${lookName.toLowerCase()}. Want it warmer, dressier or more casual?`
+        `Morning. ${weather}${condition ? ` and ${condition}` : ''}. This is your ${lookName.toLowerCase()}. Ask for a change, or just chat about the look.`
       )
     }
     // Only seed the greeting once per open.
@@ -127,7 +127,7 @@ export default function Chat({
         }
         push('assistant', String(data.reply || 'Done.'))
       } catch {
-        const message = 'I cannot reach the stylist right now. Your current look is still here.'
+        const message = 'I cannot reach Milli right now. Your current look is still here.'
         push('assistant', message)
         setError(message)
       } finally {
@@ -147,9 +147,9 @@ export default function Chat({
   }, [open, seed])
 
   return (
-    <div className={open ? 'chat on' : 'chat'} role="dialog" aria-modal="true" aria-label="Stylist">
+    <div className={open ? 'chat on' : 'chat'} role="dialog" aria-modal="true" aria-label="Milli">
       <div className="chh">
-        <h2>Stylist</h2>
+        <h2>Milli</h2>
         <button type="button" onClick={onClose}>
           Done
         </button>
@@ -173,7 +173,7 @@ export default function Chat({
           </div>
         ))}
         {sending ? (
-          <div className="bub a ty" aria-label="Stylist is thinking">
+          <div className="bub a ty" aria-label="Milli is thinking">
             <i />
             <i />
             <i />
@@ -200,10 +200,10 @@ export default function Chat({
             ref={inputRef}
             value={input}
             onChange={event => setInput(event.target.value)}
-            placeholder="Tell me the occasion"
+            placeholder="Ask anything, or name the occasion"
             autoComplete="off"
             enterKeyHint="send"
-            aria-label="Message your stylist"
+            aria-label="Message Milli"
           />
           <button className="snd" type="submit" aria-label="Send" disabled={sending || !input.trim()}>
             <SendIcon size={20} />

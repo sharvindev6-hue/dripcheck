@@ -67,11 +67,15 @@ const optionalString = z.preprocess(
 )
 
 const serverSchema = z.object({
+  NVIDIA_NIM_API_KEY: optionalString,
+  NVIDIA_NIM_MODEL: optionalString,
+  NVIDIA_NIM_VISION_MODEL: optionalString,
   FEATHERLESS_API_KEY: optionalString,
   FEATHERLESS_MODEL: optionalString,
   GEMINI_API_KEY: optionalString,
   OPENWEATHER_API_KEY: optionalString,
   SUPABASE_SERVICE_ROLE_KEY: optionalString,
+  DEMO_USER_EMAIL: optionalString,
 })
 
 export type ServerEnv = z.infer<typeof serverSchema>
@@ -86,11 +90,15 @@ export function getServerEnv(): ServerEnv {
   if (serverCache) return serverCache
 
   serverCache = serverSchema.parse({
+    NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY,
+    NVIDIA_NIM_MODEL: process.env.NVIDIA_NIM_MODEL,
+    NVIDIA_NIM_VISION_MODEL: process.env.NVIDIA_NIM_VISION_MODEL,
     FEATHERLESS_API_KEY: process.env.FEATHERLESS_API_KEY,
     FEATHERLESS_MODEL: process.env.FEATHERLESS_MODEL,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     OPENWEATHER_API_KEY: process.env.OPENWEATHER_API_KEY,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    DEMO_USER_EMAIL: process.env.DEMO_USER_EMAIL,
   })
   return serverCache
 }

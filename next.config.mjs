@@ -56,6 +56,10 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // Native ONNX/Sharp modules must stay outside the server bundle.
+    serverComponentsExternalPackages: ['@huggingface/transformers', 'onnxruntime-node', 'sharp'],
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },

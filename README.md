@@ -18,12 +18,13 @@ brass accents, Archivo display type and Instrument Sans body type. The exact con
   cost-per-wear, laundry status and "build a look around this".
 - **Add** — one piece with Gemini auto-tagging, or scan a whole outfit and confirm every extracted
   piece before saving. Photos are optional; the drawn garment flats always work.
-- **Stylist chat** — "warmer", "dressier", "more casual", "swap shoes", "all black", "another",
+- **Milli chat** — "warmer", "dressier", "more casual", "swap shoes", "all black", "another",
   or an occasion. It restyles over a validated endpoint and never invents clothes.
 - **Looks** — every logged outfit, with save/favourite and "try this look" back into Today.
 - **You** — size, silhouette preference, weather city, lifetime stats and sign out.
-- **Rules first, AI second** — the deterministic engine always produces a valid look. Featherless
-  adds a stylist voice when configured; Gemini adds vision. Any failure falls back to rules.
+- **Rules first, AI second** — the deterministic engine always produces a valid look. NVIDIA NIM
+  (or Featherless) gives Milli her voice and NVIDIA vision (or Gemini) adds tagging. Any failure
+  falls back to rules.
 - **Private by default** — per-user RLS, a private storage bucket, signed image URLs, server-side
   mutations, zod validation, rate limits and a CSP.
 
@@ -35,7 +36,8 @@ brass accents, Archivo display type and Instrument Sans body type. The exact con
 | Styling | The design system's plain CSS tokens/shell/screens + a small app layer |
 | Data / auth / storage | Supabase Postgres, Auth (email magic link), private Storage |
 | Validation | zod on every mutation body |
-| AI | Featherless (outfit JSON, optional), Gemini 1.5 Flash (tags + outfit scan, optional) |
+| AI | NVIDIA NIM (preferred, optional), Featherless (text fallback), Gemini 1.5 Flash (vision fallback) |
+| Cutout | Local BiRefNet-lite 512 (MIT) via Transformers.js + ONNX Runtime, composited on cream |
 | Weather | OpenWeather behind a server proxy (optional) |
 | Tests | Vitest; CI runs lint, typecheck, tests and a build with dummy env |
 
@@ -79,8 +81,23 @@ npm run dev
 # http://localhost:3000
 ```
 
-Open the app, enter an email, follow the magic link, and add three pieces (top, bottom, shoes). The
-stylist can then build a complete look.
+Open the app, enter an email, follow the magic link, and add three pieces (top, bottom, shoes).
+Milli can then build a complete look.
+
+### Cream cutouts
+
+One-piece photos are automatically cut out and composited onto the app's cream background
+(`#EFE8D8`). The model runs locally: the first cutout downloads BiRefNet-lite 512 (~183 MB) and can
+take 20–30 seconds; later cutouts are typically around 7 seconds on CPU. It works best on a flat lay
+or hanger against a contrasting background. Worn photos isolate the person, not just the garment.
+
+A blank or suspicious mask is flagged in the add screen; use **Use original photo** to skip it. No
+segmentation model is error-free, so review the edges before saving. The model is MIT-licensed and
+stays on this machine; only the one-time model download leaves the device.
+
+During local development, the login screen also shows **Use the demo closet** once
+`DEMO_USER_EMAIL` and `SUPABASE_SERVICE_ROLE_KEY` are set. The button and its route are disabled
+outside `NODE_ENV=development`.
 
 ## Environment variables
 
@@ -88,13 +105,16 @@ stylist can then build a complete look.
 |---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | public | yes | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | yes | Anon key; RLS is the security boundary |
-| `FEATHERLESS_API_KEY` | server | no | Enables the LLM stylist layer |
+| `NVIDIA_NIM_API_KEY` | server | no | Preferred text + vision provider |
+| `NVIDIA_NIM_MODEL` | server | no | Text model; defaults to Nemotron Bolt |
+| `NVIDIA_NIM_VISION_MODEL` | server | no | Vision model; defaults to Nemotron Super VL |
+| `FEATHERLESS_API_KEY` | server | no | Fallback LLM layer for Milli |
 | `FEATHERLESS_MODEL` | server | no | Model id; defaults in the route |
-| `GEMINI_API_KEY` | server | no | Enables auto-tagging and outfit scan |
+| `GEMINI_API_KEY` | server | no | Fallback for auto-tagging and outfit scan |
 | `OPENWEATHER_API_KEY` | server | no | Enables live weather |
 | `SUPABASE_SERVICE_ROLE_KEY` | server | no | Demo seeder + legacy storage cleanup; never expose to the browser |
 | `SUPABASE_URL` | server | seed only | Seeder URL |
-| `DEMO_USER_EMAIL` | server | seed only | Demo account |
+| `DEMO_USER_EMAIL` | server | seed only | Demo account for the seeder and dev one-click login |
 | `DEMO_SEED` | server | seed only | Must be `true` to run the seeder |
 
 A fresh clone builds with no env vars. Pages that require Supabase validate lazily and the login

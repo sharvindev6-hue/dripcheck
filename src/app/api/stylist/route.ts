@@ -15,7 +15,7 @@ import {
 import { rateLimitPair } from '@/lib/rate-limit'
 import { stylistRequestSchema } from '@/lib/schemas'
 import { normalizeItem } from '@/lib/items'
-import { getServerEnv } from '@/lib/env'
+import { callTextModel, getTextProvider } from '@/lib/ai'
 import {
   comboFromIds,
   explainOutfit,
@@ -29,11 +29,10 @@ import { orderOutfitIds } from '@/lib/outfitSlots'
 import type { Item } from '@/types'
 
 export const dynamic = 'force-dynamic'
+// Two sequential model attempts (20s each) plus the wardrobe reads.
+export const maxDuration = 60
 
-const FEATHERLESS_TIMEOUT_MS = 12_000
-const FEATHERLESS_URL = 'https://api.featherless.ai/v1/chat/completions'
-
-const SYSTEM_PROMPT = `You are the DripCheck stylist. Warm, confident, concise — max 2 sentences. You MUST pick only from the provided wardrobe items. Never invent garments. Slots are strict: top_id must be a top, bottom_id a bottom, shoes_id shoes, outer_id an outer layer or null. Prefer clean items that suit the temperature and occasion. Reply with raw JSON only, no markdown: {"top_id":"","bottom_id":"","shoes_id":"","outer_id":null,"explanation":""}`
+const SYSTEM_PROMPT = `You are Milli, the DripCheck stylist. Warm, confident, concise — max 2 sentences. You MUST pick only from the provided wardrobe items. Never invent garments. Slots are strict: top_id must be a top, bottom_id a bottom, shoes_id shoes, outer_id an outer layer or null. Prefer clean items that suit the temperature and occasion. Reply with raw JSON only, no markdown: {"top_id":"","bottom_id":"","shoes_id":"","outer_id":null,"explanation":""}`
 
 interface AiResponse {
   top_id?: string
@@ -86,33 +85,6 @@ function validateAi(
   }
 
   return { ok: true, ordered, explanation: clampExplanation(result.explanation) }
-}
-
-async function callFeatherless(messages: { role: 'system' | 'user'; content: string }[]) {
-  const env = getServerEnv()
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FEATHERLESS_TIMEOUT_MS)
-  try {
-    const response = await fetch(FEATHERLESS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${env.FEATHERLESS_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: env.FEATHERLESS_MODEL || 'featherless-ai/Qwen2.5-7B-Instruct',
-        messages,
-        temperature: 0.4,
-        max_tokens: 300,
-      }),
-      signal: controller.signal,
-    })
-    if (!response.ok) throw new Error(`featherless_${response.status}`)
-    const data = await response.json()
-    return (data?.choices?.[0]?.message?.content ?? '') as string
-  } finally {
-    clearTimeout(timer)
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -186,8 +158,7 @@ export async function POST(req: NextRequest) {
     occasion,
   }
 
-  const apiKey = getServerEnv().FEATHERLESS_API_KEY
-  if (!apiKey) return NextResponse.json(rulesResponse)
+  if (!getTextProvider()) return NextResponse.json(rulesResponse)
 
   const payload = JSON.stringify({
     items: items.map(item => ({
@@ -207,7 +178,7 @@ export async function POST(req: NextRequest) {
   })
 
   try {
-    const first = await callFeatherless([
+    const first = await callTextModel([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: payload },
     ])
@@ -225,7 +196,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const second = await callFeatherless([
+    const second = await callTextModel([
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: payload },
       {

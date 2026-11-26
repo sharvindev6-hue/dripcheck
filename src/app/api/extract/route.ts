@@ -10,7 +10,9 @@ import {
 import { rateLimitPair } from '@/lib/rate-limit'
 import {
   callGeminiJson,
+  callNvidiaVisionJson,
   clampOutfitTags,
+  NVIDIA_DEFAULT_VISION_MODEL,
   OUTFIT_PROMPT,
   parseJsonLoose,
   readUpload,
@@ -18,7 +20,8 @@ import {
 import { getServerEnv } from '@/lib/env'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+// NVIDIA (20s) plus a Gemini retry (15s) must fit inside one invocation.
+export const maxDuration = 45
 
 export async function POST(req: NextRequest) {
   const auth = await getAuth()
@@ -39,21 +42,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ items: [], error: upload.error }, { status: upload.status })
   }
 
-  const apiKey = getServerEnv().GEMINI_API_KEY
-  if (!apiKey) {
+  const env = getServerEnv()
+  const nvidiaKey = env.NVIDIA_NIM_API_KEY
+  const geminiKey = env.GEMINI_API_KEY
+  if (!nvidiaKey && !geminiKey) {
     return NextResponse.json({ items: [], error: 'no_key' }, { status: 503 })
   }
 
-  const bytes = Buffer.from(await upload.file.arrayBuffer())
-  const result = await callGeminiJson(
-    apiKey,
-    upload.mime,
-    bytes.toString('base64'),
-    OUTFIT_PROMPT
-  )
+  const base64 = Buffer.from(await upload.file.arrayBuffer()).toString('base64')
+
+  let result: Awaited<ReturnType<typeof callGeminiJson>>
+  if (nvidiaKey) {
+    result = await callNvidiaVisionJson(
+      nvidiaKey,
+      env.NVIDIA_NIM_VISION_MODEL || NVIDIA_DEFAULT_VISION_MODEL,
+      upload.mime,
+      base64,
+      OUTFIT_PROMPT
+    )
+    if (!result.ok && geminiKey) {
+      logServerError('extract:nvidia', result.error)
+      result = await callGeminiJson(geminiKey, upload.mime, base64, OUTFIT_PROMPT)
+    }
+  } else if (geminiKey) {
+    result = await callGeminiJson(geminiKey, upload.mime, base64, OUTFIT_PROMPT)
+  } else {
+    return NextResponse.json({ items: [], error: 'no_key' }, { status: 503 })
+  }
 
   if (!result.ok) {
-    logServerError('extract:gemini', result.error)
+    logServerError('extract:ai', result.error)
     return NextResponse.json({ items: [], error: result.error }, { status: result.status })
   }
 
