@@ -11,7 +11,7 @@
 @keyframes fadeup{from{opacity:0;transform:translateY(8px)}}
 
 /* stage */
-.stage{position:relative;margin:0 14px;border-radius:16px;overflow:hidden;--fh:clamp(300px,45svh,372px);padding:48px 12px 44px;display:flex;justify-content:center;
+.stage{position:relative;margin:0 14px;border-radius:16px;overflow:hidden;--fh:clamp(280px,36svh,300px);padding:48px 12px 36px;display:flex;justify-content:center;
  background:linear-gradient(180deg,transparent 88%,rgba(23,21,15,.07) 88%),linear-gradient(180deg,var(--ph),var(--ph2));color:#17150F;touch-action:pan-y}
 .sp{position:absolute;left:16px;right:16px;top:13px;display:flex;justify-content:space-between;align-items:center;font:600 12px var(--f);letter-spacing:.06em;text-transform:uppercase;color:#4d4739}
 #mt{background:var(--ac);color:var(--bk);padding:4px 9px;border-radius:6px;box-shadow:0 0 0 1.5px var(--bk)}

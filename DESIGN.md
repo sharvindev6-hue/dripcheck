@@ -85,7 +85,11 @@ App-only additions (same tokens): `.empty`, `.ltrow`, `.thumb`, `.bareflat`, `.w
   sheets through short-lived signed URLs.
 - The mannequin is built from `garment_type` + `fit` + `color_hex` (or inferred defaults). Unknown
   values fall back to a neutral flat rather than a blank tile.
-- Do not claim background removal. This build does not run a matting model.
+- One-piece uploads run a local BiRefNet-lite cutout and composite the subject onto `--bg`
+  cream (`#EFE8D8`). It is best-effort: the UI marks suspicious masks for review and always
+  offers the original photo as a fallback.
+- Worn photos isolate the person, not only the garment. The add screen recommends a flat lay or
+  hanger for a clean cutout.
 
 ## Screen map
 
@@ -94,7 +98,7 @@ App-only additions (same tokens): `.empty`, `.ltrow`, `.thumb`, `.bareflat`, `.w
 | `/login` | Brand splash / magic-link form |
 | `/` | Today: date + weather, look title, mannequin, wear, piece-by-piece, week, streak |
 | `/closet` | Search, filters, grid, item sheet (wash, cost-per-wear, build around, remove) |
-| `/add` | One piece or whole outfit, AI confirm, save |
+| `/add` | One piece or whole outfit; cream cutout preview, AI confirm, save |
 | `/looks` | Personal saved-look archive |
 | `/you` | Profile, stats, size, silhouette, city, sign out |
 | `/auth/callback` | PKCE exchange (no UI) |

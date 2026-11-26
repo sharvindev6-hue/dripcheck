@@ -5,8 +5,9 @@ A per-phase journal of what I built, what broke, and what I learned. I'll keep a
 > **Recovery note (2026-11-24):** this log predates the P0 + P1 recovery. The current
 > architecture is in `README.md` and the design contract is in `DESIGN.md`. Three claims below
 > are now superseded: the app uses one design-token CSS layer rather than a Tailwind palette;
-> stats include per-item lifetime cost-per-wear, not only a single total; and the outfit engine
-> has a Vitest suite plus a focused verification script. Auth has always been magic-link only.
+> stats include per-item lifetime cost-per-wear, not only a single total; the outfit engine
+> has a Vitest suite plus a focused verification script; and one-piece uploads now run a local
+> BiRefNet-lite cutout onto the cream background. Auth has always been magic-link only.
 
 ## Phase 0 — Skeleton (pre-hackathon scaffold)
 - Picked **Next.js 14 App Router + TypeScript** because RSC + route handlers live in the same repo, which meant no separate backend service for the hackathon.
@@ -43,12 +44,12 @@ A per-phase journal of what I built, what broke, and what I learned. I'll keep a
 - The vision route is **stateless and never writes to Supabase**. The user always sees the suggestions, edits if needed, and clicks Save. AI never has DB write power.
 
 ## Phase 7 — Visual overhaul
-- Tailwind + CSS variables turned out to be a great combo: I could name the editorial palette in `globals.css`, then re-use those names as Tailwind utilities everywhere. Zero runtime cost, zero new dependencies.
+- The first visual pass used Tailwind + CSS variables. The recovery replaced that with one token CSS layer in `src/styles`; the lesson still held: name the palette once, then use the names everywhere.
 - `next/font` with CSS variables (`--font-display`, `--font-body`) means I can swap a font in **one place** and every heading, price, and label updates. Worth the 30-second setup.
 - I tried to be cute with inline SVG sparkles and almost shipped a blurry mess. Lesson: a tiny icon needs the same care as a big one. **Aligned gradients, simple geometry, and one focal color** beats five overlapping shapes every time.
 
 ## Phase 8 — Stats + finishing
-- Cost-per-wear is a `Σprice / Σwears` calculation. Not smart, but **honest** — the alternative (per-item, time-weighted) is a week of work for a feature judges will glance at once. Ship the simple thing.
+- Cost-per-wear is now per item: `price / times_worn`, with `—` when a piece has never been worn. The early build used one lifetime total; that was honest enough for a demo, but not useful when you want to know which purchase is actually earning its keep.
 - The dashboard tries to answer the question "should I open the app today?" with three numbers: streak, pieces, cost-per-wear. If any one of them is interesting, the user is curious. If none are, they bounce — and that's also fine.
 
 ## Things I got wrong (and would do differently)
@@ -56,6 +57,13 @@ A per-phase journal of what I built, what broke, and what I learned. I'll keep a
 1. I started the visual layer too late. Editorial UI on top of working code is a one-week job; editorial UI on top of half-finished code is a re-write. **Get the data flowing first, then make it beautiful.**
 2. I added two custom CSS classes (`.shimmer`, `.fade-up`) before Tailwind had any reason to do them. If I'd reached for `transition-all duration-200` first I'd have shipped two days earlier.
 3. I spent an hour writing a "smart" color-matcher that returned *every* outfit, including the all-purple one. The dumb hue-wheel table is better — it forces the user to add variety to their closet instead of silently approving bad outfits.
+
+## Phase 9 — Final polish (2026-11-25)
+- Ran the app in a real browser at 390×844 and 1280×900 instead of trusting the build output.
+- Found the primary **Wear this** button slipping under the tab bar on a standard phone. Tightened the outfit stage so the action is visible without scrolling.
+- The cutout model had regressed to a 502 because the 2D mask tensor was passed to `RawImage`. Fixed the shape and verified the cream preview and original-photo toggle in the add flow.
+- Audited every main screen for horizontal overflow and console errors; all clear. The only overflow left is the intentionally scrollable closet category strip and the mannequin's decorative arm inside its clipped stage.
+- Rewrote the README around the real product, added real screenshots, and corrected the old "no background removal" note.
 
 ## What I want to learn next
 

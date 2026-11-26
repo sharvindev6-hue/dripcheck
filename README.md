@@ -1,82 +1,85 @@
 # DripCheck
 
-> A private digital closet that styles a complete outfit every morning.
+**A private closet that styles a complete outfit every morning.**
 
-DripCheck is a phone-first web app: photograph your clothes once, let AI tag them, and get a
-complete look for the weather that only uses pieces you own. It was built for the **Beginner's
-Paradise — FirstCommit hackathon 2026** and then hardened into a working P0 + P1 build.
+DripCheck is a phone-first wardrobe app. Photograph your clothes once, let AI fill in the
+details, and get a complete look for the weather that only uses pieces you own.
 
-The visual language is **Bottle Green + Brass**: warm bone surfaces, a deep bottle-green shell,
-brass accents, Archivo display type and Instrument Sans body type. The exact contract lives in
-[`DESIGN.md`](DESIGN.md).
+It started as a hackathon build and grew into a working P0 + P1 product: real auth, private
+storage, a rules-first outfit engine, Milli the stylist, and a local background remover that
+puts every piece on the same cream background.
+
+<p align="center">
+  <img src="docs/screenshots/today.png" width="320" alt="DripCheck Today screen with an outfit, weather, wear button and Milli ask bar" />
+</p>
 
 ## What it does
 
 - **Today** — a mannequin look built from your wardrobe, with the weather, a plain-language
-  explanation, a match score, wear logging, a weekly preview and a streak.
+  reason, a match score, wear logging, a weekly preview and a streak.
 - **Closet** — search, category filters, garment flats or private photos, item details,
-  cost-per-wear, laundry status and "build a look around this".
-- **Add** — one piece with Gemini auto-tagging, or scan a whole outfit and confirm every extracted
-  piece before saving. Photos are optional; the drawn garment flats always work.
-- **Milli chat** — "warmer", "dressier", "more casual", "swap shoes", "all black", "another",
-  or an occasion. It restyles over a validated endpoint and never invents clothes.
-- **Looks** — every logged outfit, with save/favourite and "try this look" back into Today.
+  cost-per-wear, laundry status and “build a look around this”.
+- **Add** — one piece with AI tagging, or scan a whole outfit and confirm every piece before
+  saving. Photos are optional; the drawn garment flats always work.
+- **Cream cutouts** — one-piece photos are cut out locally and composited onto the app’s cream
+  background. Suspicious masks are flagged, and the original is always one tap away.
+- **Milli** — “warmer”, “dressier”, “swap shoes”, “all black”, “another”, or an occasion.
+  Milli restyles over a validated endpoint and never invents clothes.
+- **Looks** — every logged outfit, with save / favourite and “try this look”.
 - **You** — size, silhouette preference, weather city, lifetime stats and sign out.
-- **Rules first, AI second** — the deterministic engine always produces a valid look. NVIDIA NIM
-  (or Featherless) gives Milli her voice and NVIDIA vision (or Gemini) adds tagging. Any failure
-  falls back to rules.
-- **Private by default** — per-user RLS, a private storage bucket, signed image URLs, server-side
-  mutations, zod validation, rate limits and a CSP.
+
+## A look inside
+
+| Closet | Add a piece | Looks archive |
+|---|---|---|
+| <img src="docs/screenshots/closet.png" width="250" alt="Closet grid with category filters" /> | <img src="docs/screenshots/add.png" width="250" alt="Add a piece screen with photo drop area" /> | <img src="docs/screenshots/looks.png" width="250" alt="Saved looks archive" /> |
+| <img src="docs/screenshots/you.png" width="250" alt="Profile, size and stats screen" /> | <img src="docs/screenshots/login.png" width="250" alt="Magic-link login screen" /> | <img src="docs/screenshots/today-dark.png" width="250" alt="Today screen in dark mode" /> |
+
+<p align="center">
+  <img src="docs/screenshots/today-desktop.png" width="560" alt="DripCheck in its desktop phone frame" />
+</p>
+
+The screenshots use the seeded demo closet. They are real captures, not mockups.
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
 | App | Next.js 14 App Router + TypeScript strict + React 18 |
-| Styling | The design system's plain CSS tokens/shell/screens + a small app layer |
-| Data / auth / storage | Supabase Postgres, Auth (email magic link), private Storage |
+| Styling | Hand-written CSS tokens/shell/screens; Archivo + Instrument Sans |
+| Data / auth / storage | Supabase Postgres, magic-link auth, private Storage |
 | Validation | zod on every mutation body |
-| AI | NVIDIA NIM (preferred, optional), Featherless (text fallback), Gemini 1.5 Flash (vision fallback) |
-| Cutout | Local BiRefNet-lite 512 (MIT) via Transformers.js + ONNX Runtime, composited on cream |
+| AI | NVIDIA NIM (preferred), Featherless (text fallback), Gemini (vision fallback) |
+| Cutout | Local BiRefNet-lite 512 (MIT) via Transformers.js + ONNX Runtime, on `#EFE8D8` |
 | Weather | OpenWeather behind a server proxy (optional) |
-| Tests | Vitest; CI runs lint, typecheck, tests and a build with dummy env |
+| Tests | Vitest + a rules-engine verification script; CI runs lint, typecheck, tests and a build |
 
-## Quick start
+## Run it locally
 
-### 1. Supabase
+You need Node 22+ and Docker for the local Supabase stack.
 
-Create a project at [supabase.com](https://supabase.com), then in the SQL editor run:
-
-```text
-supabase/migrations/0001_recovery.sql
+```bash
+git clone https://github.com/sharvindev6-hue/dripcheck.git
+cd dripcheck
+npm install
+npx supabase start
+npx supabase db reset
 ```
 
-That single idempotent migration creates or upgrades:
-
-- `users`, `items`, `outfits` with per-user RLS
-- the design-system columns (`garment_type`, `color_hex`, `fit`, `status`, wear counters)
-- `UNIQUE (user_id, date)` so one day has one outfit
-- a trigger that rejects an outfit containing someone else's item or invalid slots
-- the private `wardrobe-items` bucket with owner-scoped storage policies
-- a backfill of legacy public object paths into `items.image_path`
-
-Then enable **Authentication → Providers → Email** (magic link) and add
-`http://localhost:3000/auth/callback` plus your production callback URL to the redirect allow list.
-Google OAuth is **not** used.
-
-### 2. Environment
+`npx supabase status` prints the local API URL and publishable key. Put them in `.env.local`:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The AI and weather keys are
-optional; without them the app stays fully usable in rules mode with manual weather fallback.
+```text
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:55321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable key from supabase status>
+```
 
-### 3. Run
+Then run:
 
 ```bash
-npm install
 npm run dev
 # http://localhost:3000
 ```
@@ -84,72 +87,51 @@ npm run dev
 Open the app, enter an email, follow the magic link, and add three pieces (top, bottom, shoes).
 Milli can then build a complete look.
 
-### Cream cutouts
+### Seed the demo closet
 
-One-piece photos are automatically cut out and composited onto the app's cream background
-(`#EFE8D8`). The model runs locally: the first cutout downloads BiRefNet-lite 512 (~183 MB) and can
-take 20–30 seconds; later cutouts are typically around 7 seconds on CPU. It works best on a flat lay
-or hanger against a contrasting background. Worn photos isolate the person, not just the garment.
-
-A blank or suspicious mask is flagged in the add screen; use **Use original photo** to skip it. No
-segmentation model is error-free, so review the edges before saving. The model is MIT-licensed and
-stays on this machine; only the one-time model download leaves the device.
-
-During local development, the login screen also shows **Use the demo closet** once
-`DEMO_USER_EMAIL` and `SUPABASE_SERVICE_ROLE_KEY` are set. The button and its route are disabled
-outside `NODE_ENV=development`.
-
-## Environment variables
-
-| Variable | Scope | Required | Purpose |
-|---|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | public | yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | yes | Anon key; RLS is the security boundary |
-| `NVIDIA_NIM_API_KEY` | server | no | Preferred text + vision provider |
-| `NVIDIA_NIM_MODEL` | server | no | Text model; defaults to Nemotron Bolt |
-| `NVIDIA_NIM_VISION_MODEL` | server | no | Vision model; defaults to Nemotron Super VL |
-| `FEATHERLESS_API_KEY` | server | no | Fallback LLM layer for Milli |
-| `FEATHERLESS_MODEL` | server | no | Model id; defaults in the route |
-| `GEMINI_API_KEY` | server | no | Fallback for auto-tagging and outfit scan |
-| `OPENWEATHER_API_KEY` | server | no | Enables live weather |
-| `SUPABASE_SERVICE_ROLE_KEY` | server | no | Demo seeder + legacy storage cleanup; never expose to the browser |
-| `SUPABASE_URL` | server | seed only | Seeder URL |
-| `DEMO_USER_EMAIL` | server | seed only | Demo account for the seeder and dev one-click login |
-| `DEMO_SEED` | server | seed only | Must be `true` to run the seeder |
-
-A fresh clone builds with no env vars. Pages that require Supabase validate lazily and the login
-screen explains setup instead of crashing.
-
-## Demo data
+The demo user needs the service-role key, so keep it server-side only.
 
 ```bash
 DEMO_SEED=true \
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=... \
-DEMO_USER_EMAIL=you@example.com \
+SUPABASE_URL=http://127.0.0.1:55321 \
+SUPABASE_SERVICE_ROLE_KEY=<secret key from supabase status> \
+DEMO_USER_EMAIL=demo@dripcheck.local \
 npx tsx scripts/seed-demo.ts
 ```
 
-The seeder creates 16 pieces and 21 days of outfit history ending today, all marked worn, and
-updates lifetime wear counters. Seeded photos are external Unsplash URLs; new uploads use the
-private bucket.
+The seeder creates 16 pieces and 21 days of outfit history ending today, all marked worn.
+During local development, the login screen also shows **Use the demo closet** when
+`DEMO_USER_EMAIL` and `SUPABASE_SERVICE_ROLE_KEY` are set. The button and its route return 404
+outside `NODE_ENV=development`.
 
-## Architecture
+### Use a hosted Supabase project instead
+
+1. Run `supabase/migrations/0001_recovery.sql` in the SQL editor.
+2. Enable **Authentication → Providers → Email**.
+3. Add `http://localhost:3000/auth/callback` and your production callback URL to the redirect
+   allow list.
+4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
+
+The AI and weather keys are optional. Without them the app stays fully usable in rules mode
+with a manual weather fallback.
+
+## How it works
 
 ```text
-Browser (phone shell, client screens)
+Browser (phone shell)
   │  reads: Supabase (RLS-scoped)
   │  writes: only through route handlers
   ▼
 Next route handlers
-  ├── /api/items[/id]      create / update / delete (+ storage cleanup)
+  ├── /api/items[/id]      create / update / delete + storage cleanup
   ├── /api/outfits[/id]    upsert by (user, date), slot validation, wear counters
   ├── /api/profile         size / silhouette / city
   ├── /api/stats           lifetime streak and cost-per-wear
-  ├── /api/stylist         rules first → Featherless → validated fallback
-  ├── /api/chat            intent-based restyle, validated ids
-  ├── /api/vision          single-item Gemini tags
+  ├── /api/stylist         rules first → AI → validated fallback
+  ├── /api/chat            intent-based restyle with validated ids
+  ├── /api/vision          single-item AI tags
   ├── /api/extract         multi-item outfit scan
+  ├── /api/cutout          local BiRefNet cutout → cream PNG
   ├── /api/weather         OpenWeather proxy
   └── /auth/callback       PKCE code exchange
         │
@@ -158,68 +140,74 @@ Next route handlers
         └── optional AI / weather providers
 ```
 
-### Security boundaries
+Rules come first. The deterministic engine always produces a valid look; Milli is a layer on
+top, never a dependency. If an AI provider is missing, slow or returns nonsense, the app falls
+back without pretending the model answered.
 
-- Middleware redirects signed-out page requests to `/login` and returns `401` for protected APIs.
-- Every mutation checks the session, validates the body with zod, and derives the user id
-  server-side. A client never supplies `user_id`.
-- Outfit ids are checked against the caller's wardrobe **and** their categories before saving.
-  The database repeats the check in a trigger.
-- The wardrobe bucket is private. New objects live under `<user-id>/<file>`; storage policies are
-  owner-scoped. Reads use short-lived signed URLs.
-- AI/vision/weather routes are authenticated and rate-limited per user per minute and per day.
-  The limiter is in-memory per instance; use a shared store if you deploy many instances.
-- Non-GET API requests with a mismatched `Origin` are rejected.
-- Security headers and a CSP are set in `next.config.mjs`; `X-Powered-By` is disabled.
+## Cutouts
 
-## Scripts
+One-piece photos run through a local BiRefNet-lite 512 model and are composited onto the app’s
+cream background (`#EFE8D8`).
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Development server |
-| `npm run build` | Production build (works without env) |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | Vitest unit tests |
-| `npm run verify:engine` | Focused rules-engine regression check |
-| `npm run check` | lint + typecheck + tests |
+- The first cutout downloads ~183 MB and can take 20–30 seconds. Later cutouts are usually
+  around 5–7 seconds on CPU.
+- Flat lays and hangers against a contrasting background work best.
+- Worn photos isolate the person, not only the garment.
+- A blank or suspicious mask is flagged in the add screen. Use **Use original photo** to skip it.
+- No segmentation model is error-free. Review the edges before saving.
 
-CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests, then a production build with dummy
-Supabase values.
+The model is MIT-licensed and stays on the machine running the app; only the one-time model
+download leaves the device.
+
+## Project map
+
+```text
+src/app/                 routes and route handlers
+src/components/          shell, tabs, mannequin, chat, sheets, icons
+src/lib/                 rules engine, stats, Supabase, AI, cutout, validation
+src/styles/              design tokens, shell, screens
+scripts/                 demo seeder and engine check
+supabase/migrations/     idempotent schema + RLS + private storage
+docs/screenshots/        real app captures used above
+DESIGN.md                visual contract (Bottle Green + Brass)
+PLAN.md                  recovery / security / design plan
+LEARNING_LOG.md          what broke and what I learned
+```
+
+## Checks
+
+```bash
+npm run check       # lint + typecheck + unit tests
+npm run build       # production build, no real secrets needed
+npm run verify:engine
+```
+
+CI runs lint, typecheck, tests and a production build with dummy Supabase values on every push
+to `main` or `recovery/**`.
 
 ## Design
 
-The source of truth is:
-
-- `src/styles/tokens.css` — colours, type variables, motion
-- `src/styles/shell.css` — reset, phone frame, screen containers
-- `src/styles/screens.css` — Today / Closet / Looks / You / chat / sheets / camera
-- `src/app/app.css` — small app-only layouts (login, add, empty states)
-- `DESIGN.md` — the written contract
-
-The phone shell is full-screen on mobile and a centred phone frame on desktop. There is no separate
+The source of truth is [`DESIGN.md`](DESIGN.md) and the CSS files it lists. The short version:
+warm bone surfaces, a deep bottle-green shell, brass accents, Archivo display type and Instrument
+Sans body copy. Mobile is full-screen; desktop is a centred phone frame. There is no separate
 desktop layout.
 
-## Known limitations
+## Known limits
 
-- The repo does not contain a live Supabase project, AI keys or weather key, so the verified checks
-  are lint, typecheck, unit tests and production builds. Live auth/storage/AI calls need your
-  project's credentials.
-- Python/PyTorch background removal is not part of this build; garment art is drawn from typed SVG
-  flats, and optional photos are shown as uploaded. The app never claims a background was removed.
-- Social feeds, reactions, Telegram/Discord delivery and scheduled notifications are P2 and are not
-  implemented. Looks is a personal saved-look archive.
-- Rate limiting is per server instance; a multi-instance deployment should swap in Redis or a
-  managed limiter.
-- HEIC decoding depends on the browser; the upload route and bucket accept it, but some browsers
+- The cutout is best-effort, not magic. Thin straps, transparent fabric, low-contrast clothing
+  and worn garments can fail. The UI gives you a review state and an original-photo fallback.
+- The repo does not contain live Supabase, AI or weather credentials. The verified checks are
+  lint, typecheck, unit tests and production builds. Live auth / storage / AI calls need your
+  own project.
+- Rate limiting is per server instance. A multi-instance deployment should use a shared store.
+- HEIC decoding depends on the browser. The upload route and bucket accept it, but some browsers
   cannot preview HEIC locally.
 - `npm audit` flags known Next.js 14 advisories. The app does not use Server Actions, the
-  `next/image` optimizer, rewrites or a custom server, which removes several of the named paths,
-  but a framework upgrade to the current major is the real fix and is deliberately left as a
-  separate migration because it is a breaking change.
-- Legacy public wardrobe objects must be readable through the item-owned storage policy added by
-  the migration. Run the migration before making the bucket private in a production project.
+  `next/image` optimizer, rewrites or a custom server, which removes several named paths, but a
+  framework major upgrade is the real fix and is a separate migration.
+- Looks is a personal saved-look archive. Social feeds, reactions, scheduled notifications,
+  payments and a native app are not part of this build.
 
 ## License
 
-Private hackathon project.
+Private project. All rights reserved.

@@ -42,7 +42,6 @@ venv/
 .venv/
 pip-log.txt
 pip-delete-this-directory.txt
-*.sotsconfig.tsbuildinfo
 
 # TypeScript build info
 *.tsbuildinfo

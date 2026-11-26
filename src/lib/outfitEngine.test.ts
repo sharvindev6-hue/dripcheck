@@ -112,6 +112,16 @@ describe('explainOutfit', () => {
     expect(text).not.toContain('both neutral')
   })
 
+  it('uses a plural verb for plural shoe names', () => {
+    const combo = {
+      top: mk({ category: 'top', name: 'Grey tee', primary_color: 'grey' }),
+      bottom: mk({ category: 'bottom', name: 'Jeans', primary_color: 'denim' }),
+      shoes: mk({ category: 'shoes', name: 'Tan sandals', primary_color: 'tan' }),
+      score: 10,
+    }
+    expect(explainOutfit(combo, 18, 'casual')).toContain('Tan sandals finish the casual look.')
+  })
+
   it('says a coat is missing when it is cold and there is no layer', () => {
     const combo = {
       top: mk({ category: 'top', name: 'Hoodie', primary_color: 'grey' }),

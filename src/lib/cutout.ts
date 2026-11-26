@@ -23,6 +23,7 @@ interface MaskTensor {
   sigmoid: () => MaskTensor
   mul: (value: number) => MaskTensor
   to: (dtype: string) => MaskTensor
+  unsqueeze: (dimension: number) => MaskTensor
 }
 
 interface CutoutModelOutput {
@@ -97,7 +98,7 @@ export async function createCreamCutout(input: Buffer): Promise<CutoutResult> {
   const probabilities = min >= -0.001 && max <= 1.001 ? plane : plane.sigmoid()
 
   const mask = await RawImage.fromTensor(
-    probabilities.mul(255).to('uint8') as unknown as Parameters<
+    probabilities.mul(255).to('uint8').unsqueeze(0) as unknown as Parameters<
       typeof RawImage.fromTensor
     >[0]
   ).resize(image.width, image.height)

@@ -315,7 +315,8 @@ export function explainOutfit(combo: OutfitCombo, temp: number | null, occasion:
     colour = `The ${top.primary_color} against ${bottom.primary_color} is the contrast that makes it work.`
   }
 
-  return `${weather} ${colour} The ${shoes.name} finishes the ${label} look.`
+  const shoeVerb = /(?:s|x|z|ch|sh)$/i.test(shoes.name.trim()) ? 'finish' : 'finishes'
+  return `${weather} ${colour} The ${shoes.name} ${shoeVerb} the ${label} look.`
 }
 
 /** Backwards-compatible name used by older imports. */
