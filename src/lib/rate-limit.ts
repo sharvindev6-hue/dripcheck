@@ -54,6 +54,32 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   }
 }
 
+const MINUTE_MS = 60_000
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Read a window without counting a hit. `ok` means one more request would
+ * still fit inside the limit.
+ */
+function inspect(key: string, limit: number, windowMs: number, now: number): RateLimitResult {
+  const existing = buckets.get(key)
+  if (!existing || existing.resetAt <= now) {
+    return {
+      ok: true,
+      remaining: limit,
+      resetAt: now + windowMs,
+      retryAfterSeconds: Math.ceil(windowMs / 1000),
+    }
+  }
+
+  return {
+    ok: existing.count < limit,
+    remaining: Math.max(0, limit - existing.count),
+    resetAt: existing.resetAt,
+    retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+  }
+}
+
 /** Two windows at once, e.g. 20/minute plus 200/day. */
 export function rateLimitPair(
   userId: string,
@@ -61,7 +87,21 @@ export function rateLimitPair(
   perMinute: number,
   perDay: number
 ): RateLimitResult {
-  const minute = rateLimit(`${route}:m:${userId}`, perMinute, 60_000)
+  const now = Date.now()
+  prune(now)
+
+  const minuteKey = `${route}:m:${userId}`
+  const dayKey = `${route}:d:${userId}`
+
+  // Inspect both windows before counting a hit. A request rejected by one
+  // window must not burn quota in the other.
+  const day = inspect(dayKey, perDay, DAY_MS, now)
+  if (!day.ok) return day
+
+  const minute = inspect(minuteKey, perMinute, MINUTE_MS, now)
   if (!minute.ok) return minute
-  return rateLimit(`${route}:d:${userId}`, perDay, 24 * 60 * 60 * 1000)
+
+  rateLimit(minuteKey, perMinute, MINUTE_MS)
+  const counted = rateLimit(dayKey, perDay, DAY_MS)
+  return counted.ok ? counted : minute
 }

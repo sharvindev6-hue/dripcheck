@@ -69,8 +69,8 @@ export default function YouPage() {
         supabase.from('outfits').select('*').eq('user_id', user.id),
       ])
 
-      if (itemsResult.error || outfitsResult.error) {
-        throw itemsResult.error ?? outfitsResult.error
+      if (profileResult.error || itemsResult.error || outfitsResult.error) {
+        throw profileResult.error ?? itemsResult.error ?? outfitsResult.error
       }
 
       const row = profileResult.data
@@ -299,7 +299,7 @@ export default function YouPage() {
           <LockIcon size={22} />
           <span>
             Wardrobe photos live in a private bucket and are only readable by your signed-in
-            account. Item details stay private too, and the stylist only ever suggests clothes you
+            account. Item details stay private too, and Milli only ever suggests clothes you
             own.
           </span>
         </div>

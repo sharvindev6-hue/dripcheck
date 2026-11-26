@@ -9,6 +9,22 @@ function str(value: unknown, fallback: string): string {
 }
 
 /**
+ * PostgREST returns `numeric` as a string, while older cached payloads may use
+ * a number. Both `0` and `"0"` are valid prices, so a truthiness check would
+ * lose them; invalid values become null instead of leaking NaN into the UI.
+ */
+function price(value: unknown): number | null {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value >= 0 ? value : null
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+  }
+  return null
+}
+
+/**
  * Normalise a row that may predate the recovery migration. Postgres defaults
  * cover new rows, but older demo data and cached payloads can be missing the
  * design-system columns.
@@ -31,8 +47,8 @@ export function normalizeItem(row: Row): Item {
   return {
     id: String(row.id ?? ''),
     user_id: String(row.user_id ?? ''),
-    image_url: typeof row.image_url === 'string' ? row.image_url : null,
-    image_path: typeof row.image_path === 'string' ? row.image_path : null,
+    image_url: typeof row.image_url === 'string' && row.image_url.trim() ? row.image_url : null,
+    image_path: typeof row.image_path === 'string' && row.image_path.trim() ? row.image_path : null,
     name,
     category,
     primary_color: primaryColor,
@@ -40,7 +56,7 @@ export function normalizeItem(row: Row): Item {
     formality:
       row.formality === 'smart_casual' || row.formality === 'formal' ? row.formality : 'casual',
     warmth: row.warmth === 'hot' || row.warmth === 'cold' ? row.warmth : 'mild',
-    price: typeof row.price === 'number' ? row.price : row.price ? Number(row.price) : null,
+    price: price(row.price),
     garment_type: garmentType,
     color_hex: hex,
     fit,

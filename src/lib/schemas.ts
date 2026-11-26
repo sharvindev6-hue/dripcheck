@@ -9,9 +9,23 @@ import { z } from 'zod'
 import { isGarmentFit, isGarmentType } from './garment'
 
 export const uuidSchema = z.string().uuid()
+
+/** Reject shape-only dates such as 2025-02-31 or 2025-13-01. */
+function isCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  )
+}
+
 export const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD')
+  .refine(isCalendarDate, 'expected a real calendar date')
 export const colorHexSchema = z
   .string()
   .regex(/^#[0-9A-Fa-f]{6}$/, 'expected #RRGGBB')
