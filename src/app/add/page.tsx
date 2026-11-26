@@ -82,6 +82,7 @@ export default function AddPage() {
   const [error, setError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const cutoutRequest = useRef(0)
+  const analysisRequest = useRef(0)
 
   const preview = useOriginal ? originalPreview : cutoutPreview ?? originalPreview
   const showingCutout = Boolean(cutout && cutoutPreview && !useOriginal)
@@ -127,22 +128,28 @@ export default function AddPage() {
     setNotice(null)
     setScanned(null)
     cutoutRequest.current += 1
+    analysisRequest.current += 1
+    const analysisId = analysisRequest.current
 
     if (mode === 'one') {
-      void analyzeOne(next)
+      void analyzeOne(next, analysisId)
       void cutoutOne(next, cutoutRequest.current)
     } else {
-      void analyzeOutfit(next)
+      void analyzeOutfit(next, analysisId)
     }
   }
 
-  const analyzeOne = async (photo: File) => {
+  // A slow tag/extract response for an older photo must never overwrite the
+  // tags the user is now editing. Every request carries the id it started with
+  // and only the newest id is allowed to touch state.
+  const analyzeOne = async (photo: File, requestId: number) => {
     setAnalyzing(true)
     try {
       const form = new FormData()
       form.append('file', photo)
       const response = await fetch('/api/vision', { method: 'POST', body: form })
       const data = await response.json().catch(() => null)
+      if (requestId !== analysisRequest.current) return
       if (response.ok && data?.suggestedTags) {
         setTag(data.suggestedTags as Tag)
         setNotice('AI filled these in. Check every field before saving.')
@@ -154,19 +161,21 @@ export default function AddPage() {
         )
       }
     } catch {
+      if (requestId !== analysisRequest.current) return
       setNotice('AI tagging is offline. Fill the tags yourself.')
     } finally {
-      setAnalyzing(false)
+      if (requestId === analysisRequest.current) setAnalyzing(false)
     }
   }
 
-  const analyzeOutfit = async (photo: File) => {
+  const analyzeOutfit = async (photo: File, requestId: number) => {
     setAnalyzing(true)
     try {
       const form = new FormData()
       form.append('file', photo)
       const response = await fetch('/api/extract', { method: 'POST', body: form })
       const data = await response.json().catch(() => null)
+      if (requestId !== analysisRequest.current) return
       if (response.ok && Array.isArray(data?.items) && data.items.length > 0) {
         setScanned(data.items as Tag[])
         setNotice('Check the names, then add the pieces together.')
@@ -178,9 +187,38 @@ export default function AddPage() {
         )
       }
     } catch {
+      if (requestId !== analysisRequest.current) return
       setError('Outfit scanning is offline. Switch to One piece.')
     } finally {
-      setAnalyzing(false)
+      if (requestId === analysisRequest.current) setAnalyzing(false)
+    }
+  }
+
+  const switchMode = (next: 'one' | 'outfit') => {
+    if (next === mode) return
+    setMode(next)
+    setScanned(null)
+    setError(null)
+    setNotice(null)
+    cutoutRequest.current += 1
+    analysisRequest.current += 1
+    const analysisId = analysisRequest.current
+    setAnalyzing(false)
+    setCutout(null)
+    setCutoutPreview(null)
+    setCutoutStatus('idle')
+    setCutoutNotice(null)
+    setUseOriginal(false)
+
+    // Keep the chosen photo useful: re-run the new mode's analysis on it
+    // instead of making the user pick the same file again.
+    if (file) {
+      if (next === 'one') {
+        void analyzeOne(file, analysisId)
+        void cutoutOne(file, cutoutRequest.current)
+      } else {
+        void analyzeOutfit(file, analysisId)
+      }
     }
   }
 
@@ -386,36 +424,14 @@ export default function AddPage() {
           <button
             type="button"
             className={mode === 'one' ? 'on' : undefined}
-            onClick={() => {
-              setMode('one')
-              setScanned(null)
-              setError(null)
-              setNotice(null)
-              cutoutRequest.current += 1
-              setCutout(null)
-              setCutoutPreview(null)
-              setCutoutStatus('idle')
-              setCutoutNotice(null)
-              setUseOriginal(false)
-            }}
+            onClick={() => switchMode('one')}
           >
             One piece
           </button>
           <button
             type="button"
             className={mode === 'outfit' ? 'on' : undefined}
-            onClick={() => {
-              setMode('outfit')
-              setScanned(null)
-              setError(null)
-              setNotice(null)
-              cutoutRequest.current += 1
-              setCutout(null)
-              setCutoutPreview(null)
-              setCutoutStatus('idle')
-              setCutoutNotice(null)
-              setUseOriginal(false)
-            }}
+            onClick={() => switchMode('outfit')}
           >
             Whole outfit
           </button>
