@@ -1,3 +1,4 @@
+import 'server-only'
 import { getServerEnv } from './env'
 
 const AI_TIMEOUT_MS = 20_000

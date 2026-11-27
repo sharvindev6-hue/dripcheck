@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation'
 import { HangerIcon } from '@/components/icons'
 import { createClient } from '@/lib/supabase'
 import { hasPublicEnv } from '@/lib/env'
+import { safeNextPath } from '@/lib/safeNext'
 
-function safeNext(value: string | null): string {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/'
-  if (/[\u0000-\u001f]/.test(value)) return '/'
-  return value
+interface LoginFormProps {
+  demoEnabled?: boolean
 }
 
-export default function LoginForm() {
+export default function LoginForm({ demoEnabled = false }: LoginFormProps) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,11 +19,10 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const [nextPath, setNextPath] = useState('/')
   const configured = hasPublicEnv()
-  const isDevelopment = process.env.NODE_ENV === 'development'
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    const next = safeNext(params.get('next'))
+    const next = safeNextPath(params.get('next'))
     setNextPath(next)
 
     const errorCode = params.get('error')
@@ -158,7 +156,7 @@ export default function LoginForm() {
             </p>
           ) : null}
 
-          {isDevelopment ? (
+          {demoEnabled ? (
             <div className="login-demo">
               <p className="login-demo-or">or</p>
               <form action="/api/auth/demo" method="post">

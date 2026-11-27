@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { logServerError } from '@/lib/api'
+import { isDemoLoginEnabled } from '@/lib/demo'
 import { getServerEnv } from '@/lib/env'
 import { requestOrigin } from '@/lib/requestOrigin'
 import { createAdminClient } from '@/lib/supabase-server'
@@ -17,7 +18,7 @@ function loginError(origin: string) {
  * button outside development.
  */
 export async function POST(request: NextRequest) {
-  if (process.env.NODE_ENV !== 'development') {
+  if (!isDemoLoginEnabled()) {
     return new NextResponse('Not found', { status: 404 })
   }
 

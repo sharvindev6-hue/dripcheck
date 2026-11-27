@@ -4,11 +4,13 @@ import {
   getAuth,
   logServerError,
   notFound,
+  payloadTooLarge,
   serverError,
   unauthorized,
 } from '@/lib/api'
 import { itemUpdateSchema, uuidSchema } from '@/lib/schemas'
 import { normalizeItem } from '@/lib/items'
+import { readJsonBody } from '@/lib/body'
 import { createAdminClient } from '@/lib/supabase-server'
 
 export const dynamic = 'force-dynamic'
@@ -23,14 +25,12 @@ export async function PATCH(req: NextRequest, { params }: Context) {
 
   if (!uuidSchema.safeParse(params.id).success) return badRequest('bad_id')
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return badRequest('bad_json')
+  const body = await readJsonBody(req, 32 * 1024)
+  if (!body.ok) {
+    return body.reason === 'too_large' ? payloadTooLarge() : badRequest('bad_json')
   }
 
-  const parsed = itemUpdateSchema.safeParse(body)
+  const parsed = itemUpdateSchema.safeParse(body.value)
   if (!parsed.success) return badRequest('invalid_item')
 
   const { data, error } = await auth.supabase

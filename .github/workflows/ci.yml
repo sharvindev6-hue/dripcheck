@@ -33,4 +33,10 @@ jobs:
 
       - run: npm run test
 
+      # Informational: the Next.js 14 advisories need a framework major
+      # upgrade, so this stays visible without blocking every push.
+      - name: Dependency audit (informational)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
       - run: npm run build

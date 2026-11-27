@@ -12,11 +12,23 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>()
 const MAX_TRACKED_KEYS = 5_000
+// Start clearing expired windows well before the cap so a quiet process does
+// not keep stale keys around for a full day.
+const PRUNE_AT = 1_000
 
 function prune(now: number) {
-  if (buckets.size < MAX_TRACKED_KEYS) return
-  for (const [key, bucket] of buckets) {
-    if (bucket.resetAt <= now) buckets.delete(key)
+  if (buckets.size >= PRUNE_AT) {
+    for (const [key, bucket] of buckets) {
+      if (bucket.resetAt <= now) buckets.delete(key)
+    }
+  }
+
+  // Hard bound. Map iteration is insertion order, so evicting the oldest key
+  // keeps a burst of distinct users/keys from growing memory without limit.
+  while (buckets.size >= MAX_TRACKED_KEYS) {
+    const oldest = buckets.keys().next().value
+    if (oldest === undefined) break
+    buckets.delete(oldest)
   }
 }
 

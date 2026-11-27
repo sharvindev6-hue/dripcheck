@@ -23,14 +23,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'bad_form' }, { status: 400 })
   }
 
-  const upload = readUpload(form)
+  const upload = await readUpload(form)
   if ('error' in upload) {
     return NextResponse.json({ error: upload.error }, { status: upload.status })
   }
 
   try {
-    const input = Buffer.from(await upload.file.arrayBuffer())
-    const result = await createCreamCutout(input)
+    const result = await createCreamCutout(upload.buffer)
 
     // A blank mask means the model found nothing to keep. Do not save a sheet
     // of cream and call it a cutout; let the add screen keep the original.

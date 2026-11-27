@@ -8,6 +8,11 @@ import '@/styles/shell.css'
 import '@/styles/screens.css'
 import './app.css'
 
+// A per-request CSP nonce only reaches script tags that Next renders at request
+// time. The app is auth-gated and reads a session on every screen, so dynamic
+// rendering costs nothing it was not already paying.
+export const dynamic = 'force-dynamic'
+
 const archivo = localFont({
   src: '../fonts/archivo-var.woff2',
   variable: '--font-display',

@@ -51,7 +51,9 @@ export const itemCreateSchema = z
       .trim()
       .min(1)
       .max(320)
-      .regex(/^[^/]+\/[A-Za-z0-9._-]+$/, 'expected <user>/<file>')
+      // UUID folder + a filename that cannot be `.` or `..`. The route still
+      // checks the folder equals the signed-in user id.
+      .regex(/^[A-Za-z0-9-]+\/(?!\.\.?$)[A-Za-z0-9._-]+$/, 'expected <user>/<file>')
       .nullable()
       .optional(),
     garment_type: garmentTypeSchema.nullable().optional(),

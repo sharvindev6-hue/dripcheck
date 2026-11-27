@@ -3,10 +3,12 @@ import {
   badRequest,
   getAuth,
   logServerError,
+  payloadTooLarge,
   serverError,
   tooMany,
   unauthorized,
 } from '@/lib/api'
+import { readJsonBody } from '@/lib/body'
 import { chatRequestSchema } from '@/lib/schemas'
 import { normalizeItem } from '@/lib/items'
 import { rateLimitPair } from '@/lib/rate-limit'
@@ -141,14 +143,12 @@ export async function POST(req: NextRequest) {
   const limit = rateLimitPair(auth.user.id, 'chat', 30, 300)
   if (!limit.ok) return tooMany(limit)
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return badRequest('bad_json')
+  const body = await readJsonBody(req, 8 * 1024)
+  if (!body.ok) {
+    return body.reason === 'too_large' ? payloadTooLarge() : badRequest('bad_json')
   }
 
-  const parsed = chatRequestSchema.safeParse(body)
+  const parsed = chatRequestSchema.safeParse(body.value)
   if (!parsed.success) return badRequest('invalid_message')
   const input = parsed.data
 
