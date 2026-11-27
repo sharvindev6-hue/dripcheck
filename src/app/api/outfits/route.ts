@@ -3,11 +3,13 @@ import {
   badRequest,
   getAuth,
   logServerError,
+  payloadTooLarge,
   serverError,
   unauthorized,
   type ServerSupabase,
 } from '@/lib/api'
 import { outfitCreateSchema } from '@/lib/schemas'
+import { readJsonBody } from '@/lib/body'
 import { normalizeItem, normalizeOutfit } from '@/lib/items'
 import { orderOutfitIds } from '@/lib/outfitSlots'
 import { rateLimitPair } from '@/lib/rate-limit'
@@ -27,14 +29,12 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return badRequest('bad_json')
+  const body = await readJsonBody(req, 32 * 1024)
+  if (!body.ok) {
+    return body.reason === 'too_large' ? payloadTooLarge() : badRequest('bad_json')
   }
 
-  const parsed = outfitCreateSchema.safeParse(body)
+  const parsed = outfitCreateSchema.safeParse(body.value)
   if (!parsed.success) return badRequest('invalid_outfit')
   const input = parsed.data
 

@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { badRequest, forbidden, getAuth, logServerError, serverError, unauthorized } from '@/lib/api'
+import {
+  badRequest,
+  forbidden,
+  getAuth,
+  logServerError,
+  payloadTooLarge,
+  serverError,
+  unauthorized,
+} from '@/lib/api'
 import { itemCreateSchema } from '@/lib/schemas'
-import { normalizeItem, } from '@/lib/items'
+import { normalizeItem } from '@/lib/items'
+import { readJsonBody } from '@/lib/body'
 import { colorHex, inferFit, inferGarmentType } from '@/lib/garment'
 import { rateLimitPair } from '@/lib/rate-limit'
 
@@ -19,14 +28,12 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return badRequest('bad_json')
+  const body = await readJsonBody(req, 32 * 1024)
+  if (!body.ok) {
+    return body.reason === 'too_large' ? payloadTooLarge() : badRequest('bad_json')
   }
 
-  const parsed = itemCreateSchema.safeParse(body)
+  const parsed = itemCreateSchema.safeParse(body.value)
   if (!parsed.success) return badRequest('invalid_item')
   const input = parsed.data
 

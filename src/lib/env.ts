@@ -76,6 +76,9 @@ const serverSchema = z.object({
   OPENWEATHER_API_KEY: optionalString,
   SUPABASE_SERVICE_ROLE_KEY: optionalString,
   DEMO_USER_EMAIL: optionalString,
+  // Explicit opt-in for the one-click demo login. Being in development is not
+  // enough on its own: a preview deployment can run with NODE_ENV=development.
+  ENABLE_DEMO_LOGIN: optionalString,
 })
 
 export type ServerEnv = z.infer<typeof serverSchema>
@@ -99,6 +102,7 @@ export function getServerEnv(): ServerEnv {
     OPENWEATHER_API_KEY: process.env.OPENWEATHER_API_KEY,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     DEMO_USER_EMAIL: process.env.DEMO_USER_EMAIL,
+    ENABLE_DEMO_LOGIN: process.env.ENABLE_DEMO_LOGIN,
   })
   return serverCache
 }

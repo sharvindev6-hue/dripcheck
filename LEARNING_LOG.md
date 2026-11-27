@@ -65,6 +65,18 @@ A per-phase journal of what I built, what broke, and what I learned. I'll keep a
 - Audited every main screen for horizontal overflow and console errors; all clear. The only overflow left is the intentionally scrollable closet category strip and the mannequin's decorative arm inside its clipped stage.
 - Rewrote the README around the real product, added real screenshots, and corrected the old "no background removal" note.
 
+## Phase 10 - Security hardening + privacy (2026-11-26)
+- **A nonce CSP forces the whole app dynamic.** Next only stamps the nonce onto scripts it renders at request time, so the root layout now sets `force-dynamic`. For an auth-gated app that reads a session on every screen, that costs nothing it was not already paying. Verified 18/18 script tags carried the nonce on `/login`.
+- **CSP is a header, but the nonce is the hard part.** I strip any inbound `content-security-policy` header in middleware before setting my own. Otherwise a caller can hand Next a malformed nonce and the page either breaks or weakens. This is the CVE-2026-44581 class.
+- **`req.json()` is an unbounded read.** Replaced it with a streaming reader that checks `content-length` first, then caps total bytes as chunks arrive, so a chunked body cannot slip past. Empty body becomes `{}` so optional schemas still work. Oversize is `413`, not a 500.
+- **Never trust `File.type`.** The client controls both the MIME and the extension. The vision routes now read the bytes once and sniff JPEG/PNG/WebP/HEIC magic bytes; the sniffed type is what goes to the provider. Non-images are `415`.
+- **CSRF on a cookie-auth app is mostly about `Origin`.** Middleware rejects `Sec-Fetch-Site: cross-site`, a literal `null` origin, and any mismatched `Origin` for every mutating `/api` call. The browser supplies these; a non-browser client still hits session auth.
+- **Open redirects hide in normalisation.** `//evil` and `/\evil` both start with `/` but escape the origin. `safeNextPath` rejects protocol-relative, backslash and control-character paths, and one helper is now shared by middleware, the callback and the login form instead of three copies drifting apart.
+- **A demo login is a backdoor.** It now needs `NODE_ENV !== 'production'` **and** an explicit `ENABLE_DEMO_LOGIN=true`. One env flag is too easy to inherit into a preview deploy.
+- **Deletion order matters.** Remove storage first, then the auth user. If the auth delete fails you have a live account with no photos (recoverable) instead of orphaned private photos with no owner (not recoverable). Refuse to start at all when the service role is missing.
+- **An in-memory limiter still needs a ceiling.** The map prunes expired windows at 1,000 keys and hard-caps at 5,000, evicting oldest. Without that, a burst of distinct keys is its own denial of service.
+- **Write the threat model down.** `docs/SECURITY.md` lists what is covered, how it was verified, and what is deliberately still open (direct RLS writes, client-direct uploads, the Next 14 advisories). Naming the gaps is part of the fix.
+
 ## What I want to learn next
 
 - Server Components for the dashboard so the first paint shows real data without a client-side waterfall.

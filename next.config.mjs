@@ -1,41 +1,9 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV !== 'production'
 
-// Supabase may be a custom domain. Build the CSP from the configured origin so
-// signed image URLs and the auth client keep working, without guessing.
-let supabaseOrigin = ''
-try {
-  if (process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    supabaseOrigin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).origin
-  }
-} catch {
-  supabaseOrigin = ''
-}
-
-const supabaseSources = [
-  "'self'",
-  'https://*.supabase.co',
-  'wss://*.supabase.co',
-  ...(supabaseOrigin ? [supabaseOrigin] : []),
-]
-
-const csp = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "form-action 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com" +
-    (supabaseOrigin ? ` ${supabaseOrigin}` : ''),
-  "font-src 'self' data:",
-  `connect-src ${supabaseSources.join(' ')}`,
-  "manifest-src 'self'",
-].join('; ')
-
+// CSP is built per request in `src/middleware.ts` so it can carry a nonce.
+// Everything that does not depend on the request stays here.
 const securityHeaders = [
-  { key: 'Content-Security-Policy', value: csp },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
@@ -43,6 +11,8 @@ const securityHeaders = [
     key: 'Permissions-Policy',
     value: 'camera=(self), microphone=(), geolocation=()',
   },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
   ...(isDev
     ? []
     : [

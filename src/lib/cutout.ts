@@ -3,6 +3,7 @@
 // app's cream background. The model downloads once on first use and is cached
 // by the Hugging Face cache; the pipeline itself is cached per process.
 
+import 'server-only'
 import { AutoModel, AutoProcessor, RawImage } from '@huggingface/transformers'
 import sharp from 'sharp'
 

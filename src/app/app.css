@@ -148,6 +148,19 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+.delete-actions {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px 14px;
+}
+.delete-actions .btn {
+  flex: 1;
+  min-height: 46px;
+}
+a.rw {
+  text-decoration: none;
+  color: inherit;
+}
 
 /* Login -------------------------------------------------------------------- */
 .login {

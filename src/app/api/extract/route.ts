@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     return badRequest('bad_form')
   }
 
-  const upload = readUpload(form)
+  const upload = await readUpload(form)
   if ('error' in upload) {
     return NextResponse.json({ items: [], error: upload.error }, { status: upload.status })
   }
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ items: [], error: 'no_key' }, { status: 503 })
   }
 
-  const base64 = Buffer.from(await upload.file.arrayBuffer()).toString('base64')
+  const base64 = upload.buffer.toString('base64')
 
   let result: Awaited<ReturnType<typeof callGeminiJson>>
   if (nvidiaKey) {

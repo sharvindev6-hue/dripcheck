@@ -3,9 +3,11 @@ import {
   badRequest,
   getAuth,
   logServerError,
+  payloadTooLarge,
   serverError,
   unauthorized,
 } from '@/lib/api'
+import { readJsonBody } from '@/lib/body'
 import { profileUpdateSchema } from '@/lib/schemas'
 
 export const dynamic = 'force-dynamic'
@@ -32,14 +34,12 @@ export async function PATCH(req: NextRequest) {
   const auth = await getAuth()
   if (!auth) return unauthorized()
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return badRequest('bad_json')
+  const body = await readJsonBody(req, 8 * 1024)
+  if (!body.ok) {
+    return body.reason === 'too_large' ? payloadTooLarge() : badRequest('bad_json')
   }
 
-  const parsed = profileUpdateSchema.safeParse(body)
+  const parsed = profileUpdateSchema.safeParse(body.value)
   if (!parsed.success) return badRequest('invalid_profile')
 
   const { data, error } = await auth.supabase

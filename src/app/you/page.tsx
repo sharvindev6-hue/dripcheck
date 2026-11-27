@@ -47,6 +47,9 @@ export default function YouPage() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [cityDraft, setCityDraft] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const today = getTodayLocalDateString()
 
@@ -144,6 +147,32 @@ export default function YouPage() {
     }
     router.replace('/login')
     router.refresh()
+  }
+
+  const deleteAccount = async () => {
+    if (deleting || deleteConfirm !== 'DELETE') return
+    setDeleting(true)
+    try {
+      const response = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE' }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(data?.error ?? 'delete failed')
+
+      // The account is gone. Clear any client-side session and leave.
+      try {
+        await createClient().auth.signOut()
+      } catch {
+        // The server already invalidated the session.
+      }
+      router.replace('/login')
+      router.refresh()
+    } catch {
+      showToast('Could not delete the account. Try again.', 'error')
+      setDeleting(false)
+    }
   }
 
   if (loading) {
@@ -295,12 +324,75 @@ export default function YouPage() {
           </button>
         </div>
 
+        <div className="gl">Privacy &amp; data</div>
+        <div className="grp">
+          <a className="rw" href="/api/account" download>
+            <div className="t">
+              Download my data
+              <small>Profile, closet and looks as JSON</small>
+            </div>
+            <span className="v">Export</span>
+          </a>
+          <button
+            type="button"
+            className="rw danger"
+            onClick={() => setDeleteOpen(true)}
+            disabled={deleting}
+          >
+            <div className="t">
+              Delete my account
+              <small>Removes every piece, look and private photo</small>
+            </div>
+          </button>
+        </div>
+
+        {deleteOpen ? (
+          <div className="grp">
+            <div className="rw">
+              <div className="t">
+                This cannot be undone
+                <small>Type DELETE to confirm</small>
+              </div>
+              <input
+                value={deleteConfirm}
+                onChange={event => setDeleteConfirm(event.target.value)}
+                aria-label="Type DELETE to confirm account deletion"
+                className="cityinput"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <div className="delete-actions">
+              <button
+                type="button"
+                className="btn sec"
+                onClick={() => {
+                  setDeleteOpen(false)
+                  setDeleteConfirm('')
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn pri"
+                onClick={() => void deleteAccount()}
+                disabled={deleting || deleteConfirm !== 'DELETE'}
+              >
+                {deleting ? 'Deleting…' : 'Delete account'}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="priv">
           <LockIcon size={22} />
           <span>
             Wardrobe photos live in a private bucket and are only readable by your signed-in
             account. Item details stay private too, and Milli only ever suggests clothes you
-            own.
+            own. When you use AI tagging, that one photo is sent to our vision provider to
+            suggest tags; background removal runs locally.
           </span>
         </div>
       </div>

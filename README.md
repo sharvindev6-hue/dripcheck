@@ -101,8 +101,9 @@ npx tsx scripts/seed-demo.ts
 
 The seeder creates 16 pieces and 21 days of outfit history ending today, all marked worn.
 During local development, the login screen also shows **Use the demo closet** when
-`DEMO_USER_EMAIL` and `SUPABASE_SERVICE_ROLE_KEY` are set. The button and its route return 404
-outside `NODE_ENV=development`.
+`DEMO_USER_EMAIL` and `SUPABASE_SERVICE_ROLE_KEY` are set **and** `ENABLE_DEMO_LOGIN=true`.
+The flag is a deliberate second gate: the button and `/api/auth/demo` return 404 in any
+production build, or whenever the flag is not exactly `true`. Never set it in a deployment.
 
 ### Use a hosted Supabase project instead
 
@@ -144,6 +145,34 @@ Rules come first. The deterministic engine always produces a valid look; Milli i
 top, never a dependency. If an AI provider is missing, slow or returns nonsense, the app falls
 back without pretending the model answered.
 
+## Security & privacy
+
+The full write-up, including the threat model, verification results and open risks, is in
+[`docs/SECURITY.md`](docs/SECURITY.md). The short version:
+
+- **Per-request CSP with a nonce**, plus `nosniff`, `DENY` framing, a strict referrer policy,
+  COOP/CORP and production HSTS. Inbound CSP headers are stripped so a caller cannot inject a
+  nonce. The root layout renders dynamically so every script tag receives the nonce.
+- **Same-origin guard** on every mutating `/api` request: cross-site fetches and `Origin: null`
+  are rejected with `403 bad_origin`.
+- **Bounded request bodies** (`src/lib/body.ts`) with per-route caps and `413` on overflow,
+  instead of `req.json()` buffering an arbitrary payload.
+- **Magic-byte image checks** before a photo is forwarded to an AI provider; the sniffed MIME
+  wins over the client-declared type. Uploads are capped at 4 MB.
+- **Safe redirects** after login (`src/lib/safeNext.ts`) and an OTP `type` allowlist on the auth
+  callback.
+- **Private storage + RLS** on every table; the service-role key stays in server-only modules.
+- **Account export and deletion** under You → Privacy & data. The export is a JSON download with
+  short-lived signed photo links; deletion removes storage objects, rows and the auth user, and
+  refuses to run half-way if the service role is missing.
+
+```bash
+# security-relevant checks
+npm run check
+npm run build
+npm audit --omit=dev --audit-level=high   # informational; see Known limits
+```
+
 ## Cutouts
 
 One-piece photos run through a local BiRefNet-lite 512 model and are composited onto the app’s
@@ -169,6 +198,7 @@ src/styles/              design tokens, shell, screens
 scripts/                 demo seeder and engine check
 supabase/migrations/     idempotent schema + RLS + private storage
 docs/screenshots/        real app captures used above
+docs/SECURITY.md         threat model, controls, verification and open risks
 DESIGN.md                visual contract (Bottle Green + Brass)
 PLAN.md                  recovery / security / design plan
 LEARNING_LOG.md          what broke and what I learned
@@ -202,9 +232,13 @@ desktop layout.
 - Rate limiting is per server instance. A multi-instance deployment should use a shared store.
 - HEIC decoding depends on the browser. The upload route and bucket accept it, but some browsers
   cannot preview HEIC locally.
-- `npm audit` flags known Next.js 14 advisories. The app does not use Server Actions, the
-  `next/image` optimizer, rewrites or a custom server, which removes several named paths, but a
-  framework major upgrade is the real fix and is a separate migration.
+- `npm audit` still flags Next.js 14 advisories (a critical in Next and a high in its bundled
+  `postcss`). The app does not use Server Actions, the `next/image` optimizer, rewrites or a
+  custom server, which removes several named paths, but a major upgrade to Next 16 is the real
+  fix and is a separate migration. `sharp` was bumped to `^0.35.5` to clear its high advisory.
+- RLS still lets a signed-in browser write its own rows directly, and client-direct photo
+  uploads do not get the server-side magic-byte check. Both are documented, with the rest of
+  the open items, in [`docs/SECURITY.md`](docs/SECURITY.md).
 - Looks is a personal saved-look archive. Social feeds, reactions, scheduled notifications,
   payments and a native app are not part of this build.
 

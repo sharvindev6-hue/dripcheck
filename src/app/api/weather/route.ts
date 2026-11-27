@@ -6,9 +6,11 @@ import {
   badRequest,
   getAuth,
   logServerError,
+  payloadTooLarge,
   tooMany,
   unauthorized,
 } from '@/lib/api'
+import { readJsonBody } from '@/lib/body'
 import { rateLimitPair } from '@/lib/rate-limit'
 import { weatherRequestSchema } from '@/lib/schemas'
 import { getServerEnv } from '@/lib/env'
@@ -30,14 +32,12 @@ export async function POST(req: NextRequest) {
   const limit = rateLimitPair(auth.user.id, 'weather', 30, 300)
   if (!limit.ok) return tooMany(limit)
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return badRequest('bad_json')
+  const body = await readJsonBody(req, 4 * 1024)
+  if (!body.ok) {
+    return body.reason === 'too_large' ? payloadTooLarge() : badRequest('bad_json')
   }
 
-  const parsed = weatherRequestSchema.safeParse(body)
+  const parsed = weatherRequestSchema.safeParse(body.value)
   if (!parsed.success) return badRequest('invalid_city')
 
   const city = parsed.data.city ?? 'Toronto'

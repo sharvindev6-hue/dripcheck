@@ -48,6 +48,10 @@ export function conflict(code = 'conflict') {
   return NextResponse.json({ error: code }, { status: 409 })
 }
 
+export function payloadTooLarge(code = 'payload_too_large') {
+  return NextResponse.json({ error: code }, { status: 413 })
+}
+
 export function serverError(code = 'server_error') {
   return NextResponse.json({ error: code }, { status: 500 })
 }

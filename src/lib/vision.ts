@@ -2,7 +2,9 @@
 // /api/extract (a whole outfit). Every field is clamped before it reaches a
 // response or the database.
 
+import 'server-only'
 import type { Item } from '@/types'
+import { sniffImageType } from './imageSniff'
 
 export const GEMINI_MODEL = 'gemini-1.5-flash-latest'
 export const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`
@@ -260,31 +262,34 @@ export async function callNvidiaVisionJson(
   }
 }
 
-const MIME_BY_EXTENSION: Record<string, string> = {
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-  heic: 'image/heic',
-  heif: 'image/heif',
+export interface UploadedImage {
+  file: File
+  mime: string
+  buffer: Buffer
 }
 
-/** Browsers sometimes leave File.type empty or use the non-standard image/jpg. */
-function normaliseImageMime(file: File): string | null {
-  const type = file.type.toLowerCase()
-  if (type === 'image/jpg') return 'image/jpeg'
-  if (ALLOWED_IMAGE_MIME.has(type)) return type
-  const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
-  return MIME_BY_EXTENSION[extension] ?? null
-}
-
-export function readUpload(
+/**
+ * Read an uploaded image once, then trust its bytes over its declared type.
+ * `File.type` and the filename extension are both client-controlled, so the
+ * magic-byte sniff is what decides the MIME forwarded to an AI provider.
+ */
+export async function readUpload(
   formData: FormData
-): { file: File; mime: string } | { error: string; status: number } {
+): Promise<UploadedImage | { error: string; status: number }> {
   const file = formData.get('file')
   if (!(file instanceof File)) return { error: 'no_file', status: 400 }
-  const mime = normaliseImageMime(file)
-  if (!mime) return { error: 'bad_mime', status: 415 }
+  if (file.size === 0) return { error: 'empty_file', status: 400 }
   if (file.size > MAX_IMAGE_BYTES) return { error: 'too_big', status: 413 }
-  return { file, mime }
+
+  let buffer: Buffer
+  try {
+    buffer = Buffer.from(await file.arrayBuffer())
+  } catch {
+    return { error: 'unreadable_file', status: 400 }
+  }
+
+  const mime = sniffImageType(buffer)
+  if (!mime) return { error: 'bad_mime', status: 415 }
+
+  return { file, mime, buffer }
 }
